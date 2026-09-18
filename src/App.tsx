@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Dashboard = { receivedToday:number; tailoredToday:number; dueToday:number };
@@ -28,7 +28,7 @@ const leftMenu:[string,IconName][] = [
 
 function Icon({name}:{name:IconName}){
   const common={fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const};
-  const paths:Record<IconName,React.ReactNode>={
+  const paths:Record<IconName,ReactNode>={
     person:<><circle cx="10" cy="8" r="3"/><path d="M4 19c.8-3.4 2.8-5 6-5s5.2 1.6 6 5"/><path d="M18 9v6M15 12h6"/></>,
     search:<><circle cx="10" cy="10" r="5"/><path d="m14 14 5 5"/></>,
     whatsapp:<><path d="M18.5 10.5a8.5 8.5 0 0 1-10.7 8.2L4 20l1.3-3.6A8.5 8.5 0 1 1 18.5 10.5Z"/><path d="M8 8.3c.5 2.8 2.4 4.6 5.2 5.2l1.3-1.1 1.6.8c-.4 1.6-1.4 2-2.4 1.7-3.9-1.2-6.3-3.6-7.4-7.4-.3-1 .1-2 1.7-2.4l.8 1.6Z"/></>,
