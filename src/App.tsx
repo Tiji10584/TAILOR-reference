@@ -2,10 +2,25 @@ import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Dashboard = { receivedToday:number; tailoredToday:number; dueToday:number };
+type CurrentSession = { startedAt:string };
+type SessionEntry = { startedAt:string; endedAt:string };
 
-const arabicDate = new Intl.DateTimeFormat("ar-SA-u-ca-gregory",{
+const dateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory",{
   weekday:"long", day:"numeric", month:"long", year:"numeric",
-}).format(new Date());
+});
+const hijriDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura",{
+  day:"numeric", month:"long", year:"numeric",
+});
+const timeFormat = new Intl.DateTimeFormat("ar-SA",{hour:"numeric",minute:"2-digit",hour12:true});
+
+function databaseDate(value:string){return new Date(value.replace(" ","T"));}
+function durationLabel(milliseconds:number){
+  const totalMinutes=Math.max(0,Math.floor(milliseconds/60000));
+  const hours=Math.floor(totalMinutes/60);
+  const minutes=totalMinutes%60;
+  if(hours===0)return `${minutes} دقيقة`;
+  return `${hours} ساعة${minutes ? ` و ${minutes} دقيقة` : ""}`;
+}
 
 type IconName = "person"|"search"|"whatsapp"|"finance"|"supplier"|"income"|"delivery"|"notes"|"report"|"access"|"inventory";
 
@@ -53,19 +68,44 @@ function MenuCard({label,icon}:{label:string;icon:IconName}){
 
 export default function App(){
   const [data,setData]=useState<Dashboard|null>(null);
+  const [session,setSession]=useState<CurrentSession|null>(null);
+  const [history,setHistory]=useState<SessionEntry[]>([]);
+  const [historyOpen,setHistoryOpen]=useState(false);
+  const [now,setNow]=useState(Date.now());
   const [error,setError]=useState("");
 
   async function load(){
-    try{setError("");setData(await invoke<Dashboard>("dashboard_summary"));}
-    catch{setError("تعذر قراءة بيانات المحل المحلية.");}
+    try{
+      setError("");
+      const [dashboard,current]=await Promise.all([
+        invoke<Dashboard>("dashboard_summary"),
+        invoke<CurrentSession>("current_session"),
+      ]);
+      setData(dashboard);
+      setSession(current);
+    }catch{setError("تعذر قراءة بيانات المحل المحلية.");}
   }
 
-  useEffect(()=>{void load();},[]);
+  async function showHistory(){
+    setHistoryOpen(true);
+    try{setHistory(await invoke<SessionEntry[]>("session_history"));}
+    catch{setError("تعذر قراءة سجل التشغيل.");}
+  }
+
+  useEffect(()=>{
+    void load();
+    const interval=window.setInterval(()=>setNow(Date.now()),1000);
+    return ()=>window.clearInterval(interval);
+  },[]);
+
+  const today=new Date();
+  const started=session ? databaseDate(session.startedAt) : null;
+  const elapsed=started ? durationLabel(now-started.getTime()) : "—";
 
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><span>ت</span><div><strong>TAILOR</strong><small>إدارة التفصيل</small></div></div>
-      <time>{arabicDate}</time>
+      <time>{dateFormat.format(today)}</time>
     </header>
 
     <div className="workspace">
@@ -79,7 +119,7 @@ export default function App(){
           <span>مساحة العمل</span>
           <h1>مرحباً بك</h1>
           <p>هذه نظرة اليوم على حركة التفصيل والتسليم.</p>
-          <time>{arabicDate}</time>
+          <time>{dateFormat.format(today)}</time>
         </section>
 
         <section className="metric-grid" aria-live="polite">
@@ -87,6 +127,21 @@ export default function App(){
           <article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong>{data?.tailoredToday??"—"}</strong></article>
           <article className="metric-card due"><span className="metric-icon">◷</span><p>موعودين اليوم</p><strong>{data?.dueToday??"—"}</strong></article>
         </section>
+
+        <button className="session-card" type="button" onClick={()=>void showHistory()}>
+          <span className="session-kicker">سجل تشغيل التطبيق</span>
+          <span className="session-dates">
+            <strong>{dateFormat.format(today)}</strong>
+            <small>هجريًا: {hijriDateFormat.format(today)}</small>
+          </span>
+          <span className="session-runtime">
+            <small>فُتح التطبيق عند</small>
+            <strong>{started ? timeFormat.format(started) : "—"}</strong>
+            <small>مدة التشغيل الحالية</small>
+            <b>{elapsed}</b>
+          </span>
+          <span className="session-action">اضغط لعرض سجل الأيام ←</span>
+        </button>
 
         {error&&<p className="error">{error}</p>}
       </section>
@@ -96,5 +151,25 @@ export default function App(){
         <div className="side-cards">{leftMenu.map(([label,icon])=><MenuCard key={label} label={label} icon={icon}/>)}</div>
       </aside>
     </div>
+
+    {historyOpen&&<div className="history-overlay" role="presentation" onMouseDown={()=>setHistoryOpen(false)}>
+      <section className="history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title" onMouseDown={event=>event.stopPropagation()}>
+        <div className="history-head">
+          <div><span>تشغيل التطبيق</span><h2 id="history-title">سجل أوقات التشغيل</h2></div>
+          <button type="button" onClick={()=>setHistoryOpen(false)} aria-label="إغلاق">×</button>
+        </div>
+        <div className="history-list">
+          {history.length===0&&<p>لا توجد جلسات مكتملة بعد. تُحفظ الجلسة عند إغلاق التطبيق.</p>}
+          {history.map((item,index)=>{
+            const start=databaseDate(item.startedAt);
+            const end=databaseDate(item.endedAt);
+            return <article className="history-row" key={`${item.startedAt}-${index}`}>
+              <div><strong>{dateFormat.format(start)}</strong><small>هجريًا: {hijriDateFormat.format(start)}</small></div>
+              <div><span>{timeFormat.format(start)} — {timeFormat.format(end)}</span><b>{durationLabel(end.getTime()-start.getTime())}</b></div>
+            </article>;
+          })}
+        </div>
+      </section>
+    </div>}
   </main>;
 }
