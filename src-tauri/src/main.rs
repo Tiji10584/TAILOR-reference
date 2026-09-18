@@ -109,17 +109,19 @@ fn session_history(app:AppHandle)->Result<Vec<SessionEntry>,String>{
 fn main(){
  tauri::Builder::default()
   .setup(|app|{
-   let session_id=begin_session(&app.handle()) .map_err(std::io::Error::other)?;
+   let session_id=begin_session(&app.handle()).map_err(std::io::Error::other)?;
    app.manage(SessionState(Mutex::new(Some(session_id))));
    Ok(())
   })
   .on_window_event(|window,event|{
    if let WindowEvent::CloseRequested{..}=event{
     let state=window.state::<SessionState>();
-    if let Ok(mut session_id)=state.0.lock(){
-     if let Some(id)=session_id.take(){
-      let _=finish_session(&window.app_handle(),id);
-     }
+    let session_id=match state.0.lock(){
+     Ok(mut guard)=>guard.take(),
+     Err(_)=>None,
+    };
+    if let Some(id)=session_id{
+     let _=finish_session(&window.app_handle(),id);
     }
    }
   })
