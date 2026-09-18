@@ -48,7 +48,6 @@ function MenuCard({label,icon}:{label:string;icon:IconName}){
   return <div className="nav-card" aria-disabled="true">
     <span className="nav-icon"><Icon name={icon}/></span>
     <span>{label}</span>
-    {label==="إضافة عميل"&&<b className="card-plus">+</b>}
   </div>;
 }
 
@@ -84,9 +83,9 @@ export default function App(){
         </section>
 
         <section className="metric-grid" aria-live="polite">
-          <article className="metric-card received"><span className="metric-icon">↓</span><p>الثياب المستلمة اليوم</p><strong>{data?.receivedToday??"—"}</strong><small>طلب دخل اليوم</small></article>
-          <article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong>{data?.tailoredToday??"—"}</strong><small>ثوب اكتمل تفصيله اليوم</small></article>
-          <article className="metric-card due"><span className="metric-icon">◷</span><p>تسليمات اليوم</p><strong>{data?.dueToday??"—"}</strong><small>ثوب موعد تسليمه اليوم</small></article>
+          <article className="metric-card received"><span className="metric-icon">↓</span><p>القبض</p><strong>{data?.receivedToday??"—"}</strong></article>
+          <article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong>{data?.tailoredToday??"—"}</strong></article>
+          <article className="metric-card due"><span className="metric-icon">◷</span><p>موعودين اليوم</p><strong>{data?.dueToday??"—"}</strong></article>
         </section>
 
         {error&&<p className="error">{error}</p>}
