@@ -1,2 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;500;700&display=swap');
-:root{font-family:"Noto Kufi Arabic",system-ui,sans-serif;color:#eef4ef;background:#0d1716}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% 0,#2c4a43 0,transparent 34%),#0d1716}.app-shell{max-width:1220px;margin:auto;padding:32px;min-height:100vh}.topbar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #315148;padding-bottom:22px}.brand{display:flex;gap:12px;align-items:center}.brand>span{display:grid;place-items:center;background:#d5a33a;color:#152220;font-size:1.6rem;font-weight:700;width:48px;height:48px;border-radius:15px}.brand strong,.brand small{display:block}.brand small,time{color:#9db0aa;font-size:.78rem}.welcome{padding:72px 0 36px}.welcome span{color:#e0b85d;font-size:.8rem}.welcome h1{font-size:3rem;margin:10px 0}.welcome p{color:#b8c7c1;max-width:600px}.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.summary-card{min-height:210px;border:1px solid #36564e;border-radius:24px;padding:28px;display:flex;gap:22px;align-items:center;background:linear-gradient(135deg,#1c2e2b,#152320);box-shadow:0 18px 40px #0004}.summary-card.printing{background:linear-gradient(135deg,#2d2b20,#201f18);border-color:#6e623e}.card-icon{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;background:#d5a33a;color:#152220;font-size:1.8rem;font-weight:700}.printing .card-icon{background:#eee0ae}.summary-card span,.summary-card small{display:block;color:#b6c6c0}.summary-card strong{display:block;font-size:4.1rem;line-height:1.2;color:#fff;margin:8px 0}.note{margin-top:30px;padding:24px;border:1px solid #315148;border-radius:20px;background:#13211e;display:flex;justify-content:space-between;gap:24px;align-items:center}.note p{color:#afc0ba;line-height:1.8;max-width:720px}.note button{font:inherit;border:1px solid #d5a33a;color:#f8e9bb;background:transparent;padding:11px 18px;border-radius:12px;cursor:pointer}.error{color:#ffbcaa}@media(max-width:700px){.app-shell{padding:20px}.welcome{padding-top:44px}.welcome h1{font-size:2.2rem}.summary-grid{grid-template-columns:1fr}.note{display:block}.note button{margin-top:10px}.topbar time{display:none}}
+
+:root{font-family:"Noto Kufi Arabic",system-ui,sans-serif;color:#eef4ef;background:#0d1716}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% 0,#2c4a43 0,transparent 34%),#0d1716}
+button{font:inherit}
+.app-shell{max-width:1220px;margin:auto;padding:32px;min-height:100vh}
+.topbar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #315148;padding-bottom:22px}
+.brand{display:flex;gap:12px;align-items:center}
+.brand>span{display:grid;place-items:center;background:#d5a33a;color:#152220;font-size:1.6rem;font-weight:700;width:48px;height:48px;border-radius:15px}
+.brand strong,.brand small{display:block}
+.brand small,time{color:#9db0aa;font-size:.78rem}
+.welcome{padding:72px 0 36px}
+.welcome span,.section-heading span{color:#e0b85d;font-size:.8rem}
+.welcome h1{font-size:3rem;margin:10px 0}
+.welcome p{color:#b8c7c1;max-width:600px}
+.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.summary-card{min-height:210px;border:1px solid #36564e;border-radius:24px;padding:28px;display:flex;gap:22px;align-items:center;background:linear-gradient(135deg,#1c2e2b,#152320);box-shadow:0 18px 40px #0004}
+.summary-card.printing{background:linear-gradient(135deg,#2d2b20,#201f18);border-color:#6e623e}
+.card-icon{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;background:#d5a33a;color:#152220;font-size:1.8rem;font-weight:700}
+.printing .card-icon{background:#eee0ae}
+.summary-card span,.summary-card small{display:block;color:#b6c6c0}
+.summary-card strong{display:block;font-size:4.1rem;line-height:1.2;color:#fff;margin:8px 0}
+.menu-section{margin-top:48px;padding-top:34px;border-top:1px solid #315148}
+.section-heading h2{font-size:1.5rem;margin:8px 0 20px}
+.menu-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.menu-card{min-height:170px;width:100%;border:1px solid #5d725f;border-radius:22px;padding:24px;text-align:right;color:#f7f7ef;background:linear-gradient(135deg,#224039,#172a27);display:flex;gap:18px;align-items:center;position:relative;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.menu-card:hover{transform:translateY(-3px);border-color:#d5a33a;box-shadow:0 16px 30px #0004}
+.menu-icon{width:70px;height:70px;border-radius:20px;background:#d5a33a;display:grid;place-items:center;flex:0 0 auto}
+.menu-icon svg{width:47px;height:47px;fill:none;stroke:#17312c;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.menu-icon .plus{stroke:#17312c}
+.menu-card b,.menu-card small{display:block}
+.menu-card b{font-size:1.15rem}
+.menu-card small{color:#b8c7c1;margin-top:5px;font-size:.76rem}
+.menu-card i{position:absolute;left:18px;top:15px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:1.35rem;color:#f8e9bb;border:1px solid #d5a33a}
+.note{margin-top:30px;padding:24px;border:1px solid #315148;border-radius:20px;background:#13211e;display:flex;justify-content:space-between;gap:24px;align-items:center}
+.note p{color:#afc0ba;line-height:1.8;max-width:720px}
+.note button{border:1px solid #d5a33a;color:#f8e9bb;background:transparent;padding:11px 18px;border-radius:12px;cursor:pointer}
+.error{color:#ffbcaa}
+@media(max-width:700px){.app-shell{padding:20px}.welcome{padding-top:44px}.welcome h1{font-size:2.2rem}.summary-grid,.menu-grid{grid-template-columns:1fr}.note{display:block}.note button{margin-top:10px}.topbar time{display:none}}
