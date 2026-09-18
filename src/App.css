@@ -51,5 +51,26 @@ button{font:inherit}
 .history-head span{color:#d8ac48;font-size:.75rem}.history-head h2{margin:6px 0 0;font-size:1.55rem}.history-head button{width:39px;height:39px;border:1px solid #4d665b;border-radius:12px;background:#223b33;color:#fff;font-size:1.7rem;line-height:1;cursor:pointer}
 .history-list{display:grid;gap:12px;margin-top:18px}.history-list>p{color:#b7c8c0;text-align:center;padding:34px 12px}
 .history-row{display:flex;justify-content:space-between;gap:18px;padding:18px;border:1px solid #36584e;border-radius:16px;background:#132720}.history-row div{display:grid;gap:5px}.history-row small{color:#a5b7af;font-size:.7rem}.history-row div:last-child{text-align:left}.history-row span{font-size:.77rem;color:#d7e1dc}.history-row b{font-family:Georgia,serif;color:#efd993;font-size:1.3rem}
+
+@media(min-width:1101px){
+ html,body,#root{height:100%;overflow:hidden}
+ .app-shell{height:100vh;min-height:0;padding:18px 28px}
+ .topbar{height:64px;padding-bottom:12px}
+ .workspace{height:calc(100vh - 100px);min-height:0;padding-top:18px}
+ .side-menu{top:0;height:100%;min-height:0}
+ .dashboard{height:100%;min-height:0;padding:0 4px;display:grid;grid-template-rows:190px 220px minmax(170px,1fr);gap:16px}
+ .greeting{padding:22px 18px;border-bottom:1px solid #315147}
+ .greeting h1{margin:5px 0 7px;font-size:clamp(2.2rem,3vw,3.25rem)}
+ .greeting time{margin-top:10px}
+ .metric-grid{height:100%;padding:0;gap:18px}
+ .metric-card{min-height:0;padding:18px 20px}
+ .metric-icon{width:43px;height:43px;font-size:1.25rem}
+ .metric-card p{margin:15px 0 7px}
+ .metric-card strong{font-size:3.35rem}
+ .session-card{height:100%;min-height:0;margin-top:0;padding:20px 22px}
+ .session-kicker{font-size:.7rem}
+ .session-dates strong{font-size:1rem}
+ .session-runtime b{font-size:1.65rem}
+}
 @media(max-width:1100px){.workspace{grid-template-columns:195px minmax(0,1fr) 195px;gap:17px}.app-shell{padding:18px}.metric-grid{grid-template-columns:1fr}.metric-card{min-height:180px}.dashboard,.side-menu{min-height:0}.greeting{padding-top:30px}.side-cards{grid-auto-rows:auto}.nav-card{min-height:74px}.session-card{grid-template-columns:1fr 1fr;min-height:0}.session-kicker{grid-column:1/-1}.session-action{grid-column:1/-1;justify-self:start}.session-dates{border-left:0;border-bottom:1px solid #456257;padding:0 0 15px}}
 @media(max-width:760px){.workspace{display:flex;flex-direction:column;padding-top:20px}.side-menu{position:static;width:100%}.side-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard{width:100%;order:-1}.greeting{padding:24px 4px}.metric-grid{grid-template-columns:1fr}.topbar time{display:none}.app-shell{padding:16px}.nav-card{min-height:68px}.nav-card>span:last-of-type{font-size:.7rem}.session-card{grid-template-columns:1fr;padding:22px}.history-row{flex-direction:column}.history-row div:last-child{text-align:right}}
