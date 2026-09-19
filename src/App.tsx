@@ -6,13 +6,13 @@ type CurrentSession = { startedAt:string };
 type SessionEntry = { startedAt:string; endedAt:string };
 type DisplaySession = { start:Date; end:Date; active:boolean; key:string };
 
-const dateFormat = new Intl.DateTimeFormat("en-GB",{
-  weekday:"long", day:"2-digit", month:"short", year:"numeric",
+const dateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn",{
+  weekday:"long", day:"2-digit", month:"long", year:"numeric",
 });
-const hijriDateFormat = new Intl.DateTimeFormat("en-GB-u-ca-islamic-umalqura",{
-  day:"2-digit", month:"short", year:"numeric",
+const hijriDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn",{
+  weekday:"long", day:"2-digit", month:"long", year:"numeric",
 });
-const timeFormat = new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false});
+const timeFormat = new Intl.DateTimeFormat("ar-SA-u-nu-latn",{hour:"2-digit",minute:"2-digit",hour12:false});
 const numberFormat = new Intl.NumberFormat("en-US",{useGrouping:false});
 
 function databaseDate(value:string){return new Date(value.replace(" ","T"));}
@@ -149,7 +149,7 @@ export default function App(){
           <span className="session-kicker">سجل تشغيل التطبيق</span>
           <span className="session-dates">
             <strong className="numeric">{dateFormat.format(today)}</strong>
-            <small className="numeric">Hijri: {hijriDateFormat.format(today)}</small>
+            <small className="numeric">هجريًا: {hijriDateFormat.format(today)}</small>
           </span>
           <span className="session-runtime">
             <small>فُتح التطبيق عند</small>
@@ -174,8 +174,8 @@ export default function App(){
         <div className="history-head">
           <div><span>تشغيل التطبيق</span><h2 id="history-title">سجل أوقات التشغيل</h2></div>
           <label className="history-filter">
-            <span>ابحث بالتاريخ</span>
-            <input className="numeric" type="date" lang="en" value={selectedDay} onChange={event=>setSelectedDay(event.target.value)}/>
+            <span>ابحث بالتاريخ الميلادي</span>
+            <input className="numeric" type="date" lang="ar-SA-u-ca-gregory-nu-latn" value={selectedDay} onChange={event=>setSelectedDay(event.target.value)}/>
           </label>
           <button type="button" onClick={()=>setHistoryOpen(false)} aria-label="إغلاق">×</button>
         </div>
@@ -185,7 +185,7 @@ export default function App(){
         <div className="history-list">
           {filteredHistory.length===0&&<p>{selectedDay ? "لا توجد جلسات في التاريخ المختار." : "لا توجد جلسات مكتملة بعد."}</p>}
           {filteredHistory.map(item=><article className="history-row" key={item.key}>
-            <div><strong className="numeric">{dateFormat.format(item.start)}</strong><small className="numeric">Hijri: {hijriDateFormat.format(item.start)}</small></div>
+            <div><strong className="numeric">{dateFormat.format(item.start)}</strong><small className="numeric">هجريًا: {hijriDateFormat.format(item.start)}</small></div>
             <div><span className="numeric">{timeFormat.format(item.start)} — {timeFormat.format(item.end)}</span><b className="numeric">{durationLabel(item.end.getTime()-item.start.getTime())}</b>{item.active&&<small>نشطة الآن</small>}</div>
           </article>)}
         </div>
