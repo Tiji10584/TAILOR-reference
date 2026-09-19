@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Dashboard = { receivedToday:number; tailoredToday:number; dueToday:number };
 type CurrentSession = { startedAt:string };
 type SessionEntry = { startedAt:string; endedAt:string };
 type DisplaySession = { start:Date; end:Date; active:boolean; key:string };
+type Customer = { id:number; code:string; name:string; phone:string };
+type View = "dashboard"|"add-customer"|"customer-next";
 
 const dateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn",{
   weekday:"long", day:"2-digit", month:"long", year:"numeric",
@@ -25,6 +27,9 @@ function durationLabel(milliseconds:number){
   const minutes=totalMinutes%60;
   if(hours===0)return `${numberFormat.format(minutes)} دقيقة`;
   return `${numberFormat.format(hours)} ساعة${minutes ? ` و ${numberFormat.format(minutes)} دقيقة` : ""}`;
+}
+function latinDigits(value:string){
+  return value.replace(/[٠-٩۰-۹]/g,digit=>String("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹".indexOf(digit)%10));
 }
 
 type IconName = "person"|"search"|"whatsapp"|"finance"|"supplier"|"income"|"delivery"|"notes"|"report"|"access"|"inventory";
@@ -64,14 +69,15 @@ function Icon({name}:{name:IconName}){
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>{paths[name]}</svg>;
 }
 
-function MenuCard({label,icon}:{label:string;icon:IconName}){
-  return <div className="nav-card" aria-disabled="true">
+function MenuCard({label,icon,onSelect}:{label:string;icon:IconName;onSelect?:()=>void}){
+  return <button className={`nav-card ${onSelect ? "is-enabled" : "is-locked"}`} type="button" onClick={onSelect} aria-disabled={!onSelect} tabIndex={onSelect ? 0 : -1}>
     <span className="nav-icon"><Icon name={icon}/></span>
     <span>{label}</span>
-  </div>;
+  </button>;
 }
 
 export default function App(){
+  const [view,setView]=useState<View>("dashboard");
   const [data,setData]=useState<Dashboard|null>(null);
   const [session,setSession]=useState<CurrentSession|null>(null);
   const [history,setHistory]=useState<SessionEntry[]>([]);
@@ -79,6 +85,11 @@ export default function App(){
   const [selectedDay,setSelectedDay]=useState("");
   const [now,setNow]=useState(Date.now());
   const [error,setError]=useState("");
+  const [customerName,setCustomerName]=useState("");
+  const [customerPhone,setCustomerPhone]=useState("");
+  const [customerError,setCustomerError]=useState("");
+  const [savingCustomer,setSavingCustomer]=useState(false);
+  const [savedCustomer,setSavedCustomer]=useState<Customer|null>(null);
 
   async function load(){
     try{
@@ -96,6 +107,30 @@ export default function App(){
     setHistoryOpen(true);
     try{setHistory(await invoke<SessionEntry[]>("session_history"));}
     catch{setError("تعذر قراءة سجل التشغيل.");}
+  }
+
+  function closeCustomer(){
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerError("");
+    setSavedCustomer(null);
+    setView("dashboard");
+  }
+
+  async function saveCustomer(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    const name=customerName.trim();
+    const phone=latinDigits(customerPhone).trim();
+    if(!name){setCustomerError("اكتب اسم العميل.");return;}
+    if(phone.replace(/\D/g,"").length<7){setCustomerError("اكتب رقم جوال صحيحًا بالأرقام الإنجليزية.");return;}
+    try{
+      setSavingCustomer(true);
+      setCustomerError("");
+      const customer=await invoke<Customer>("create_customer",{name,phone});
+      setSavedCustomer(customer);
+      setView("customer-next");
+    }catch{setCustomerError("تعذر حفظ العميل. حاول مرة أخرى.");}
+    finally{setSavingCustomer(false);}
   }
 
   useEffect(()=>{
@@ -125,10 +160,10 @@ export default function App(){
       <time className="numeric">{dateFormat.format(today)}</time>
     </header>
 
-    <div className="workspace">
+    {view==="dashboard"&&<div className="workspace">
       <aside className="side-menu side-right">
         <p className="side-label">القائمة الرئيسية</p>
-        <div className="side-cards">{rightMenu.map(([label,icon])=><MenuCard key={label} label={label} icon={icon}/>)}</div>
+        <div className="side-cards">{rightMenu.map(([label,icon],index)=><MenuCard key={label} label={label} icon={icon} onSelect={index===0 ? ()=>setView("add-customer") : undefined}/>)}</div>
       </aside>
 
       <section className="dashboard">
@@ -167,9 +202,45 @@ export default function App(){
         <p className="side-label">متابعة المحل</p>
         <div className="side-cards">{leftMenu.map(([label,icon])=><MenuCard key={label} label={label} icon={icon}/>)}</div>
       </aside>
-    </div>
+    </div>}
 
-    {historyOpen&&<div className="history-overlay" role="presentation" onMouseDown={()=>setHistoryOpen(false)}>
+    {view==="add-customer"&&<section className="customer-workspace" dir="rtl">
+      <div className="customer-page-head">
+        <button className="page-close" type="button" onClick={closeCustomer} aria-label="إغلاق بدون حفظ">×</button>
+        <span>العملاء</span>
+        <h1>إضافة عميل جديد</h1>
+        <p>أدخل البيانات الأساسية للعميل، ثم احفظ للانتقال إلى الخطوة التالية.</p>
+      </div>
+      <form className="customer-form" onSubmit={event=>void saveCustomer(event)}>
+        <div className="customer-fields">
+          <label>
+            <span>اسم العميل</span>
+            <input autoFocus value={customerName} onChange={event=>setCustomerName(event.target.value)} placeholder="اكتب الاسم الكامل" autoComplete="name"/>
+          </label>
+          <label>
+            <span>رقم الجوال</span>
+            <input className="numeric" type="tel" inputMode="numeric" dir="ltr" value={customerPhone} onChange={event=>setCustomerPhone(latinDigits(event.target.value).replace(/[^0-9+ -]/g,""))} placeholder="05XXXXXXXX" autoComplete="tel"/>
+          </label>
+        </div>
+        {customerError&&<p className="customer-error" role="alert">{customerError}</p>}
+        <div className="customer-actions">
+          <button className="save-customer" type="submit" disabled={savingCustomer}>{savingCustomer ? "جارٍ الحفظ…" : "حفظ ومتابعة"}</button>
+          <button className="clear-customer" type="button" onClick={()=>{setCustomerName("");setCustomerPhone("");setCustomerError("");}}>مسح المدخلات</button>
+          <button className="cancel-customer" type="button" onClick={closeCustomer}>إغلاق بدون حفظ</button>
+        </div>
+      </form>
+    </section>}
+
+    {view==="customer-next"&&<section className="customer-next" dir="rtl">
+      <span className="saved-mark">✓</span>
+      <span>تم الحفظ</span>
+      <h1>تمت إضافة العميل</h1>
+      <p><strong>{savedCustomer?.name}</strong>{savedCustomer&&<> — <b className="numeric">{savedCustomer.code}</b></>}</p>
+      <small>سنكمل محتوى الخطوة التالية لاحقًا.</small>
+      <button type="button" onClick={closeCustomer}>العودة إلى الرئيسية</button>
+    </section>}
+
+    {view==="dashboard"&&historyOpen&&<div className="history-overlay" role="presentation" onMouseDown={()=>setHistoryOpen(false)}>
       <section className="history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title" onMouseDown={event=>event.stopPropagation()}>
         <div className="history-head">
           <div><span>تشغيل التطبيق</span><h2 id="history-title">سجل أوقات التشغيل</h2></div>
