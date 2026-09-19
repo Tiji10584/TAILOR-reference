@@ -97,7 +97,7 @@ fn current_session(app:AppHandle)->Result<CurrentSession,String>{
 fn session_history(app:AppHandle)->Result<Vec<SessionEntry>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
-  "SELECT started_at,ended_at FROM app_sessions WHERE ended_at IS NOT NULL ORDER BY id DESC LIMIT 30"
+  "SELECT started_at,ended_at FROM app_sessions WHERE ended_at IS NOT NULL ORDER BY id DESC"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|Ok(SessionEntry{
   started_at:row.get(0)?,
