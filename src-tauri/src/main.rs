@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{params,Connection};
 use serde::Serialize;
 use std::{fs,path::PathBuf,sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
@@ -14,6 +14,9 @@ struct CurrentSession{started_at:String}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct SessionEntry{started_at:String,ended_at:String}
+
+#[derive(Serialize)]
+struct Customer{id:i64,code:String,name:String,phone:String}
 
 struct SessionState(Mutex<Option<i64>>);
 
@@ -41,6 +44,13 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    id INTEGER PRIMARY KEY AUTOINCREMENT,
    started_at TEXT NOT NULL,
    ended_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS customers(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   customer_code TEXT UNIQUE,
+   name TEXT NOT NULL,
+   phone TEXT NOT NULL,
+   created_at TEXT NOT NULL
   );
  ").map_err(|e|e.to_string())?;
  if !has_column(&conn,"tailored_date")?{
@@ -106,6 +116,27 @@ fn session_history(app:AppHandle)->Result<Vec<SessionEntry>,String>{
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
+#[tauri::command]
+fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,String>{
+ let name=name.trim().to_string();
+ let phone=phone.trim().to_string();
+ if name.is_empty(){return Err("اسم العميل مطلوب".into())}
+ if phone.chars().filter(|character|character.is_ascii_digit()).count()<7{
+  return Err("رقم الجوال غير صحيح".into())
+ }
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ transaction.execute(
+  "INSERT INTO customers(customer_code,name,phone,created_at) VALUES(NULL,?1,?2,datetime('now','localtime'))",
+  params![&name,&phone]
+ ).map_err(|e|e.to_string())?;
+ let id=transaction.last_insert_rowid();
+ let code=format!("A{id}");
+ transaction.execute("UPDATE customers SET customer_code=?1 WHERE id=?2",params![&code,id]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())?;
+ Ok(Customer{id,code,name,phone})
+}
+
 fn main(){
  tauri::Builder::default()
   .setup(|app|{
@@ -125,7 +156,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history,create_customer])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
