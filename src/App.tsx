@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Dashboard = { receivedToday:number; tailoredToday:number; dueToday:number };
@@ -6,261 +6,82 @@ type CurrentSession = { startedAt:string };
 type SessionEntry = { startedAt:string; endedAt:string };
 type DisplaySession = { start:Date; end:Date; active:boolean; key:string };
 type Customer = { id:number; code:string; name:string; phone:string };
-type View = "dashboard"|"add-customer"|"customer-next";
+type DesignOption = { id:number; category:string; name:string; imageData:string };
+type InvoiceRecord = { id:number; invoiceNumber:string; createdAt:string };
+type View = "dashboard"|"add-customer"|"order"|"settings";
 
-const dateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn",{
-  weekday:"long", day:"2-digit", month:"long", year:"numeric",
-});
-const hijriDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn",{
-  weekday:"long", day:"2-digit", month:"long", year:"numeric",
-});
+const dateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+const shortDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn",{day:"2-digit",month:"2-digit",year:"numeric"});
+const hijriDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
 const timeFormat = new Intl.DateTimeFormat("ar-SA-u-nu-latn",{hour:"2-digit",minute:"2-digit",hour12:false});
-const numberFormat = new Intl.NumberFormat("en-US",{useGrouping:false});
+const numberFormat = new Intl.NumberFormat("en-US",{useGrouping:false,maximumFractionDigits:2});
 
+const measurementFields = ["الطول","طول الخلف","الكتف","ميل الكتف","طول الكم","الوسع","وسع الصدر","وسع الورك","وسع الرقبة","وسع اليد","مفصل أعلى","مفصل وسط","مفصل اليد","كفة اليد","وسع تحت","كفة تحت"] as const;
+const fabricFields = ["ID القماش","اسم القماش","طول الجنزور","عرض الجنزور","طول التخليص","طول الجيب","عرض الجيب","عرض التخليص"] as const;
+const defaultCategories = ["الرقبة والقلاب","اليد والكبك","الجيب","السحب","الجنب وأسفل الثوب","التطريز","الأزرار","الجنزور والتخليص"];
+
+function blankFields(fields:readonly string[]){return Object.fromEntries(fields.map(field=>[field,""])) as Record<string,string>}
 function databaseDate(value:string){return new Date(value.replace(" ","T"));}
-function dayKey(date:Date){
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
-}
-function durationLabel(milliseconds:number){
-  const totalMinutes=Math.max(0,Math.floor(milliseconds/60000));
-  const hours=Math.floor(totalMinutes/60);
-  const minutes=totalMinutes%60;
-  if(hours===0)return `${numberFormat.format(minutes)} دقيقة`;
-  return `${numberFormat.format(hours)} ساعة${minutes ? ` و ${numberFormat.format(minutes)} دقيقة` : ""}`;
-}
-function latinDigits(value:string){
-  return value.replace(/[٠-٩۰-۹]/g,digit=>String("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹".indexOf(digit)%10));
-}
+function dayKey(date:Date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;}
+function latinDigits(value:string){return value.replace(/[٠-٩۰-۹]/g,digit=>String("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹".indexOf(digit)%10));}
+function numericValue(value:string){return Number(latinDigits(value).replace(/[^0-9.-]/g,""))||0}
+function durationLabel(milliseconds:number){const totalMinutes=Math.max(0,Math.floor(milliseconds/60000));const hours=Math.floor(totalMinutes/60);const minutes=totalMinutes%60;if(hours===0)return `${numberFormat.format(minutes)} دقيقة`;return `${numberFormat.format(hours)} ساعة${minutes?` و ${numberFormat.format(minutes)} دقيقة`:""}`;}
+function imageFromFile(file:File){return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("read"));reader.onload=()=>{const image=new Image();image.onerror=()=>reject(new Error("image"));image.onload=()=>{const scale=Math.min(1,1200/Math.max(image.width,image.height));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));canvas.getContext("2d")?.drawImage(image,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",.84));};image.src=String(reader.result);};reader.readAsDataURL(file);});}
 
 type IconName = "person"|"search"|"whatsapp"|"finance"|"supplier"|"income"|"delivery"|"notes"|"report"|"access"|"inventory";
-
-const rightMenu:[string,IconName][] = [
-  ["إضافة عميل","person"],
-  ["بحث عن عميل","search"],
-  ["إعلانات واتساب","whatsapp"],
-  ["المعاملات المالية","finance"],
-  ["الموردون","supplier"],
-];
-
-const leftMenu:[string,IconName][] = [
-  ["دخل إضافي","income"],
-  ["توزيع الثياب","delivery"],
-  ["ملاحظات جديدة","notes"],
-  ["تقرير يومي","report"],
-  ["الصلاحيات","access"],
-  ["المخزون","inventory"],
-];
+const rightMenu:[string,IconName][] = [["إضافة عميل","person"],["بحث عن عميل","search"],["إعلانات واتساب","whatsapp"],["المعاملات المالية","finance"],["الموردون","supplier"]];
+const leftMenu:[string,IconName][] = [["دخل إضافي","income"],["توزيع الثياب","delivery"],["ملاحظات جديدة","notes"],["تقرير يومي","report"],["الصلاحيات","access"],["المخزون","inventory"]];
 
 function Icon({name}:{name:IconName}){
   const common={fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const};
-  const paths:Record<IconName,ReactNode>={
-    person:<><circle cx="10" cy="8" r="3"/><path d="M4 19c.8-3.4 2.8-5 6-5s5.2 1.6 6 5"/><path d="M18 9v6M15 12h6"/></>,
-    search:<><circle cx="10" cy="10" r="5"/><path d="m14 14 5 5"/></>,
-    whatsapp:<><path d="M18.5 10.5a8.5 8.5 0 0 1-10.7 8.2L4 20l1.3-3.6A8.5 8.5 0 1 1 18.5 10.5Z"/><path d="M8 8.3c.5 2.8 2.4 4.6 5.2 5.2l1.3-1.1 1.6.8c-.4 1.6-1.4 2-2.4 1.7-3.9-1.2-6.3-3.6-7.4-7.4-.3-1 .1-2 1.7-2.4l.8 1.6Z"/></>,
-    finance:<><path d="M3.5 7.5h17v11h-17z"/><path d="M3.5 10h17M8 15h3"/></>,
-    supplier:<><path d="M4 9h16v11H4z"/><path d="M7 9V6h10v3M8 14h8"/></>,
-    income:<><path d="M4 16 9 11l3 3 7-8"/><path d="M14 6h5v5"/></>,
-    delivery:<><path d="M3 8h11v9H3zM14 11h3l3 3v3h-6z"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></>,
-    notes:<><path d="M5 3.5h14v17H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
-    report:<><path d="M4 20V4"/><path d="M7 17v-5M12 17V8M17 17V5"/></>,
-    access:<><path d="M12 3 19 6v5c0 4.2-2.6 7.3-7 10-4.4-2.7-7-5.8-7-10V6z"/><path d="M9.5 12 11 13.5l3.5-4"/></>,
-    inventory:<><path d="m4 8 8-4 8 4-8 4zM4 8v8l8 4 8-4V8M12 12v8"/></>,
-  };
+  const paths:Record<IconName,ReactNode>={person:<><circle cx="10" cy="8" r="3"/><path d="M4 19c.8-3.4 2.8-5 6-5s5.2 1.6 6 5"/><path d="M18 9v6M15 12h6"/></>,search:<><circle cx="10" cy="10" r="5"/><path d="m14 14 5 5"/></>,whatsapp:<><path d="M18.5 10.5a8.5 8.5 0 0 1-10.7 8.2L4 20l1.3-3.6A8.5 8.5 0 1 1 18.5 10.5Z"/><path d="M8 8.3c.5 2.8 2.4 4.6 5.2 5.2l1.3-1.1 1.6.8c-.4 1.6-1.4 2-2.4 1.7-3.9-1.2-6.3-3.6-7.4-7.4-.3-1 .1-2 1.7-2.4l.8 1.6Z"/></>,finance:<><path d="M3.5 7.5h17v11h-17z"/><path d="M3.5 10h17M8 15h3"/></>,supplier:<><path d="M4 9h16v11H4z"/><path d="M7 9V6h10v3M8 14h8"/></>,income:<><path d="M4 16 9 11l3 3 7-8"/><path d="M14 6h5v5"/></>,delivery:<><path d="M3 8h11v9H3zM14 11h3l3 3v3h-6z"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></>,notes:<><path d="M5 3.5h14v17H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></>,report:<><path d="M4 20V4"/><path d="M7 17v-5M12 17V8M17 17V5"/></>,access:<><path d="M12 3 19 6v5c0 4.2-2.6 7.3-7 10-4.4-2.7-7-5.8-7-10V6z"/><path d="M9.5 12 11 13.5l3.5-4"/></>,inventory:<><path d="m4 8 8-4 8 4-8 4zM4 8v8l8 4 8-4V8M12 12v8"/></>};
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>{paths[name]}</svg>;
 }
+function MenuCard({label,icon,onSelect}:{label:string;icon:IconName;onSelect?:()=>void}){return <button className={`nav-card ${onSelect?"is-enabled":"is-locked"}`} type="button" onClick={onSelect} aria-disabled={!onSelect} tabIndex={onSelect?0:-1}><span className="nav-icon"><Icon name={icon}/></span><span>{label}</span></button>}
 
-function MenuCard({label,icon,onSelect}:{label:string;icon:IconName;onSelect?:()=>void}){
-  return <button className={`nav-card ${onSelect ? "is-enabled" : "is-locked"}`} type="button" onClick={onSelect} aria-disabled={!onSelect} tabIndex={onSelect ? 0 : -1}>
-    <span className="nav-icon"><Icon name={icon}/></span>
-    <span>{label}</span>
-  </button>;
-}
+type SheetProps={customer:Customer;invoice:InvoiceRecord|null;weight:string;deliveryDate:string;totalThobes:string;measurements:Record<string,string>;fabric:Record<string,string>;designs:Record<string,DesignOption|undefined>;thobeType:string;notes:string};
+function MeasurementSheet(props:SheetProps){const designs=Object.entries(props.designs).filter((entry):entry is [string,DesignOption]=>Boolean(entry[1]));return <article className="paper measurement-paper" dir="rtl"><header><div><b>ورقة مقاسات الخياط</b><small>TAILOR</small></div><div><strong className="numeric">{props.invoice?.invoiceNumber||"مسودة"}</strong><small>{shortDateFormat.format(new Date())}</small></div></header><section className="paper-customer"><span>العميل: <b>{props.customer.name}</b></span><span>رقم العميل: <b className="numeric">{props.customer.code}</b></span><span>الجوال: <b className="numeric">{props.customer.phone}</b></span><span>الوزن: <b className="numeric">{props.weight||"—"}</b></span><span>التسليم: <b className="numeric">{props.deliveryDate||"—"}</b></span><span>عدد الثياب: <b className="numeric">{props.totalThobes||"1"}</b></span></section><h3>المقاسات</h3><section className="paper-measurements">{measurementFields.map(field=><div key={field}><span>{field}</span><b className="numeric">{props.measurements[field]||"—"}</b></div>)}</section><section className="paper-split"><div><h3>القماش والتفاصيل</h3>{fabricFields.map(field=>props.fabric[field]&&<p key={field}><span>{field}</span><b className="numeric">{props.fabric[field]}</b></p>)}<p><span>نوع التفصيل</span><b>{props.thobeType}</b></p>{props.notes&&<p><span>ملاحظة</span><b>{props.notes}</b></p>}</div><div><h3>الأشكال المختارة</h3><div className="paper-designs">{designs.length===0&&<small>لم تُحدد أشكال</small>}{designs.map(([category,option])=><figure key={category}><img src={option.imageData}/><figcaption>{category}<b>{option.name}</b></figcaption></figure>)}</div></div></section></article>}
+function ReceiptSheet({customer,invoice,total,paid,discount,remaining,paymentMethod}:{customer:Customer;invoice:InvoiceRecord|null;total:number;paid:number;discount:number;remaining:number;paymentMethod:string}){return <article className="paper receipt-paper" dir="rtl"><h2>TAILOR</h2><p>فاتورة العميل</p><hr/><div><span>رقم الفاتورة</span><b className="numeric">{invoice?.invoiceNumber||"مسودة"}</b></div><div><span>العميل</span><b>{customer.name}</b></div><div><span>الجوال</span><b className="numeric">{customer.phone}</b></div><div><span>التاريخ</span><b className="numeric">{shortDateFormat.format(new Date())}</b></div><hr/><div><span>الإجمالي</span><b className="numeric">{numberFormat.format(total)} ر.س</b></div><div><span>المدفوع — {paymentMethod}</span><b className="numeric">{numberFormat.format(paid)} ر.س</b></div><div><span>الخصم</span><b className="numeric">{numberFormat.format(discount)} ر.س</b></div><div className="receipt-total"><span>المتبقي</span><b className="numeric">{numberFormat.format(remaining)} ر.س</b></div><hr/><small>شكرًا لتعاملكم معنا</small></article>}
 
 export default function App(){
-  const [view,setView]=useState<View>("dashboard");
-  const [data,setData]=useState<Dashboard|null>(null);
-  const [session,setSession]=useState<CurrentSession|null>(null);
-  const [history,setHistory]=useState<SessionEntry[]>([]);
-  const [historyOpen,setHistoryOpen]=useState(false);
-  const [selectedDay,setSelectedDay]=useState("");
-  const [now,setNow]=useState(Date.now());
-  const [error,setError]=useState("");
-  const [customerName,setCustomerName]=useState("");
-  const [customerPhone,setCustomerPhone]=useState("");
-  const [customerError,setCustomerError]=useState("");
-  const [savingCustomer,setSavingCustomer]=useState(false);
-  const [savedCustomer,setSavedCustomer]=useState<Customer|null>(null);
+  const [view,setView]=useState<View>("dashboard");const [data,setData]=useState<Dashboard|null>(null);const [session,setSession]=useState<CurrentSession|null>(null);const [history,setHistory]=useState<SessionEntry[]>([]);const [historyOpen,setHistoryOpen]=useState(false);const [selectedDay,setSelectedDay]=useState("");const [now,setNow]=useState(Date.now());const [error,setError]=useState("");
+  const [customerName,setCustomerName]=useState("");const [customerPhone,setCustomerPhone]=useState("");const [customerError,setCustomerError]=useState("");const [savingCustomer,setSavingCustomer]=useState(false);const [currentCustomer,setCurrentCustomer]=useState<Customer|null>(null);
+  const [designOptions,setDesignOptions]=useState<DesignOption[]>([]);const [settingsCategory,setSettingsCategory]=useState(defaultCategories[0]);const [optionName,setOptionName]=useState("");const [optionImage,setOptionImage]=useState("");const [settingsError,setSettingsError]=useState("");const [pickerCategory,setPickerCategory]=useState<string|null>(null);const [selectedDesigns,setSelectedDesigns]=useState<Record<string,DesignOption|undefined>>({});
+  const [measurements,setMeasurements]=useState<Record<string,string>>(()=>blankFields(measurementFields));const [fabric,setFabric]=useState<Record<string,string>>(()=>blankFields(fabricFields));const [unit,setUnit]=useState<"سم"|"إنش">("سم");const [weight,setWeight]=useState("");const [deliveryDate,setDeliveryDate]=useState("");const [dayCount,setDayCount]=useState("0");const [totalThobes,setTotalThobes]=useState("1");const [thobeType,setThobeType]=useState("سعودي");const [notes,setNotes]=useState("");
+  const [totalPrice,setTotalPrice]=useState("");const [paidAmount,setPaidAmount]=useState("");const [discount,setDiscount]=useState("");const [paymentMethod,setPaymentMethod]=useState("كاش");const [invoice,setInvoice]=useState<InvoiceRecord|null>(null);const [orderLocked,setOrderLocked]=useState(false);const [savingInvoice,setSavingInvoice]=useState(false);const [orderMessage,setOrderMessage]=useState("");const [previewOpen,setPreviewOpen]=useState(false);
+  const total=numericValue(totalPrice),paid=numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
 
-  async function load(){
-    try{
-      setError("");
-      const [dashboard,current]=await Promise.all([
-        invoke<Dashboard>("dashboard_summary"),
-        invoke<CurrentSession>("current_session"),
-      ]);
-      setData(dashboard);
-      setSession(current);
-    }catch{setError("تعذر قراءة بيانات المحل المحلية.");}
-  }
+  async function load(){try{setError("");const [dashboard,current]=await Promise.all([invoke<Dashboard>("dashboard_summary"),invoke<CurrentSession>("current_session")]);setData(dashboard);setSession(current)}catch{setError("تعذر قراءة بيانات المحل المحلية.")}}
+  async function loadDesignOptions(){try{setDesignOptions(await invoke<DesignOption[]>("list_design_options"))}catch{setSettingsError("تعذر قراءة مكتبة الأشكال.")}}
+  async function showHistory(){setHistoryOpen(true);try{setHistory(await invoke<SessionEntry[]>("session_history"))}catch{setError("تعذر قراءة سجل التشغيل.")}}
+  useEffect(()=>{void load();void loadDesignOptions();const interval=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(interval)},[]);
+  function closeCustomer(){setCustomerName("");setCustomerPhone("");setCustomerError("");setView("dashboard")}
+  async function saveCustomer(event:FormEvent<HTMLFormElement>){event.preventDefault();const name=customerName.trim(),phone=latinDigits(customerPhone).trim();if(!name){setCustomerError("اكتب اسم العميل.");return}if(phone.replace(/\D/g,"").length<7){setCustomerError("اكتب رقم جوال صحيحًا بالأرقام الإنجليزية.");return}try{setSavingCustomer(true);setCustomerError("");const customer=await invoke<Customer>("create_customer",{name,phone});setCurrentCustomer(customer);resetInvoice();setView("order")}catch{setCustomerError("تعذر حفظ العميل. حاول مرة أخرى.")}finally{setSavingCustomer(false)}}
+  function resetInvoice(){setMeasurements(blankFields(measurementFields));setFabric(blankFields(fabricFields));setSelectedDesigns({});setWeight("");setDeliveryDate("");setDayCount("0");setTotalThobes("1");setThobeType("سعودي");setNotes("");setTotalPrice("");setPaidAmount("");setDiscount("");setPaymentMethod("كاش");setInvoice(null);setOrderLocked(false);setOrderMessage("")}
+  function changeDeliveryDate(value:string){setDeliveryDate(value);if(!value){setDayCount("0");return}const delivery=new Date(`${value}T00:00:00`),todayDate=new Date();todayDate.setHours(0,0,0,0);setDayCount(String(Math.max(0,Math.ceil((delivery.getTime()-todayDate.getTime())/86400000))))}
+  async function saveInvoice(){if(!currentCustomer)return;try{setSavingInvoice(true);setOrderMessage("");const record=await invoke<InvoiceRecord>("save_invoice",{payload:{id:invoice?.id??null,customerId:currentCustomer.id,weight,deliveryDate,dayCount:Number(dayCount)||0,totalThobes:Number(totalThobes)||1,totalPrice,paidAmount,paymentMethod,discount,notes,measurementsJson:JSON.stringify(measurements),fabricJson:JSON.stringify(fabric),designsJson:JSON.stringify(Object.fromEntries(Object.entries(selectedDesigns).map(([category,option])=>[category,option?.id]))),detailsJson:JSON.stringify({thobeType,unit})}});setInvoice(record);setOrderLocked(true);setOrderMessage(`تم حفظ الفاتورة ${record.invoiceNumber}`)}catch{setOrderMessage("تعذر حفظ الفاتورة.")}finally{setSavingInvoice(false)}}
+  async function selectImage(event:ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];if(!file)return;try{setOptionImage(await imageFromFile(file));setSettingsError("")}catch{setSettingsError("تعذر قراءة الصورة.")}}
+  async function addDesignOption(event:FormEvent<HTMLFormElement>){event.preventDefault();if(!settingsCategory.trim()||!optionName.trim()||!optionImage){setSettingsError("اكتب اسم النوع واختر صورته.");return}try{await invoke("add_design_option",{category:settingsCategory.trim(),name:optionName.trim(),imageData:optionImage});setOptionName("");setOptionImage("");setSettingsError("");await loadDesignOptions()}catch{setSettingsError("تعذر حفظ النوع والصورة.")}}
+  async function deleteDesignOption(id:number){try{await invoke("delete_design_option",{id});setSelectedDesigns(current=>Object.fromEntries(Object.entries(current).filter(([,option])=>option?.id!==id)));await loadDesignOptions()}catch{setSettingsError("تعذر حذف النوع.")}}
+  function printSheet(target:"measurements"|"receipt"){document.body.dataset.printTarget=target;window.setTimeout(()=>{window.print();window.setTimeout(()=>delete document.body.dataset.printTarget,500)},80)}
 
-  async function showHistory(){
-    setHistoryOpen(true);
-    try{setHistory(await invoke<SessionEntry[]>("session_history"));}
-    catch{setError("تعذر قراءة سجل التشغيل.");}
-  }
+  const today=new Date(),started=session?databaseDate(session.startedAt):null,elapsed=started?durationLabel(now-started.getTime()):"—";
+  const displayHistory=useMemo<DisplaySession[]>(()=>{const saved=history.map((item,index)=>({start:databaseDate(item.startedAt),end:databaseDate(item.endedAt),active:false,key:`${item.startedAt}-${index}`}));if(started)saved.unshift({start:started,end:new Date(now),active:true,key:`active-${session?.startedAt}`});return saved},[history,now,session?.startedAt,started]);const filteredHistory=selectedDay?displayHistory.filter(item=>dayKey(item.start)===selectedDay):displayHistory;
+  const sheetProps=currentCustomer?{customer:currentCustomer,invoice,weight,deliveryDate,totalThobes,measurements,fabric,designs:selectedDesigns,thobeType,notes}:null;
 
-  function closeCustomer(){
-    setCustomerName("");
-    setCustomerPhone("");
-    setCustomerError("");
-    setSavedCustomer(null);
-    setView("dashboard");
-  }
-
-  async function saveCustomer(event:FormEvent<HTMLFormElement>){
-    event.preventDefault();
-    const name=customerName.trim();
-    const phone=latinDigits(customerPhone).trim();
-    if(!name){setCustomerError("اكتب اسم العميل.");return;}
-    if(phone.replace(/\D/g,"").length<7){setCustomerError("اكتب رقم جوال صحيحًا بالأرقام الإنجليزية.");return;}
-    try{
-      setSavingCustomer(true);
-      setCustomerError("");
-      const customer=await invoke<Customer>("create_customer",{name,phone});
-      setSavedCustomer(customer);
-      setView("customer-next");
-    }catch{setCustomerError("تعذر حفظ العميل. حاول مرة أخرى.");}
-    finally{setSavingCustomer(false);}
-  }
-
-  useEffect(()=>{
-    void load();
-    const interval=window.setInterval(()=>setNow(Date.now()),1000);
-    return ()=>window.clearInterval(interval);
-  },[]);
-
-  const today=new Date();
-  const started=session ? databaseDate(session.startedAt) : null;
-  const elapsed=started ? durationLabel(now-started.getTime()) : "—";
-  const displayHistory=useMemo<DisplaySession[]>(()=>{
-    const saved=history.map((item,index)=>({
-      start:databaseDate(item.startedAt),
-      end:databaseDate(item.endedAt),
-      active:false,
-      key:`${item.startedAt}-${index}`,
-    }));
-    if(started)saved.unshift({start:started,end:new Date(now),active:true,key:`active-${session?.startedAt}`});
-    return saved;
-  },[history,now,session?.startedAt,started]);
-  const filteredHistory=selectedDay ? displayHistory.filter(item=>dayKey(item.start)===selectedDay) : displayHistory;
-
-  return <main className="app-shell">
-    <header className="topbar">
-      <div className="brand"><span>ت</span><div><strong>TAILOR</strong><small>إدارة التفصيل</small></div></div>
-      <time className="numeric">{dateFormat.format(today)}</time>
-    </header>
-
-    {view==="dashboard"&&<div className="workspace">
-      <aside className="side-menu side-right">
-        <p className="side-label">القائمة الرئيسية</p>
-        <div className="side-cards">{rightMenu.map(([label,icon],index)=><MenuCard key={label} label={label} icon={icon} onSelect={index===0 ? ()=>setView("add-customer") : undefined}/>)}</div>
-      </aside>
-
-      <section className="dashboard">
-        <section className="greeting">
-          <span>مساحة العمل</span>
-          <h1>مرحباً بك</h1>
-          <p>هذه نظرة اليوم على حركة التفصيل والتسليم.</p>
-          <time className="numeric">{dateFormat.format(today)}</time>
-        </section>
-
-        <section className="metric-grid" aria-live="polite">
-          <article className="metric-card received"><span className="metric-icon">↓</span><p>القبض</p><strong className="numeric">{data ? numberFormat.format(data.receivedToday) : "—"}</strong></article>
-          <article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong className="numeric">{data ? numberFormat.format(data.tailoredToday) : "—"}</strong></article>
-          <article className="metric-card due"><span className="metric-icon">◷</span><p>موعودين اليوم</p><strong className="numeric">{data ? numberFormat.format(data.dueToday) : "—"}</strong></article>
-        </section>
-
-        <button className="session-card" type="button" onClick={()=>void showHistory()}>
-          <span className="session-kicker">سجل تشغيل التطبيق</span>
-          <span className="session-dates">
-            <strong className="numeric">{dateFormat.format(today)}</strong>
-            <small className="numeric">هجريًا: {hijriDateFormat.format(today)}</small>
-          </span>
-          <span className="session-runtime">
-            <small>فُتح التطبيق عند</small>
-            <strong className="numeric">{started ? timeFormat.format(started) : "—"}</strong>
-            <small>مدة التشغيل الحالية</small>
-            <b className="numeric">{elapsed}</b>
-          </span>
-          <span className="session-action">عرض سجل الأيام ←</span>
-        </button>
-
-        {error&&<p className="error">{error}</p>}
-      </section>
-
-      <aside className="side-menu side-left">
-        <p className="side-label">متابعة المحل</p>
-        <div className="side-cards">{leftMenu.map(([label,icon])=><MenuCard key={label} label={label} icon={icon}/>)}</div>
-      </aside>
-    </div>}
-
-    {view==="add-customer"&&<section className="customer-workspace" dir="rtl">
-      <div className="customer-page-head">
-        <button className="page-close" type="button" onClick={closeCustomer} aria-label="إغلاق بدون حفظ">×</button>
-        <span>العملاء</span>
-        <h1>إضافة عميل جديد</h1>
-        <p>أدخل البيانات الأساسية للعميل، ثم احفظ للانتقال إلى الخطوة التالية.</p>
-      </div>
-      <form className="customer-form" onSubmit={event=>void saveCustomer(event)}>
-        <div className="customer-fields">
-          <label>
-            <span>اسم العميل</span>
-            <input autoFocus value={customerName} onChange={event=>setCustomerName(event.target.value)} placeholder="اكتب الاسم الكامل" autoComplete="name"/>
-          </label>
-          <label>
-            <span>رقم الجوال</span>
-            <input className="numeric" type="tel" inputMode="numeric" dir="ltr" value={customerPhone} onChange={event=>setCustomerPhone(latinDigits(event.target.value).replace(/[^0-9+ -]/g,""))} placeholder="05XXXXXXXX" autoComplete="tel"/>
-          </label>
-        </div>
-        {customerError&&<p className="customer-error" role="alert">{customerError}</p>}
-        <div className="customer-actions">
-          <button className="save-customer" type="submit" disabled={savingCustomer}>{savingCustomer ? "جارٍ الحفظ…" : "حفظ ومتابعة"}</button>
-          <button className="clear-customer" type="button" onClick={()=>{setCustomerName("");setCustomerPhone("");setCustomerError("");}}>مسح المدخلات</button>
-          <button className="cancel-customer" type="button" onClick={closeCustomer}>إغلاق بدون حفظ</button>
-        </div>
-      </form>
-    </section>}
-
-    {view==="customer-next"&&<section className="customer-next" dir="rtl">
-      <span className="saved-mark">✓</span>
-      <span>تم الحفظ</span>
-      <h1>تمت إضافة العميل</h1>
-      <p><strong>{savedCustomer?.name}</strong>{savedCustomer&&<> — <b className="numeric">{savedCustomer.code}</b></>}</p>
-      <small>سنكمل محتوى الخطوة التالية لاحقًا.</small>
-      <button type="button" onClick={closeCustomer}>العودة إلى الرئيسية</button>
-    </section>}
-
-    {view==="dashboard"&&historyOpen&&<div className="history-overlay" role="presentation" onMouseDown={()=>setHistoryOpen(false)}>
-      <section className="history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title" onMouseDown={event=>event.stopPropagation()}>
-        <div className="history-head">
-          <div><span>تشغيل التطبيق</span><h2 id="history-title">سجل أوقات التشغيل</h2></div>
-          <label className="history-filter">
-            <span>ابحث بالتاريخ الميلادي</span>
-            <input className="numeric" type="date" lang="ar-SA-u-ca-gregory-nu-latn" value={selectedDay} onChange={event=>setSelectedDay(event.target.value)}/>
-          </label>
-          <button type="button" onClick={()=>setHistoryOpen(false)} aria-label="إغلاق">×</button>
-        </div>
-        <div className="history-summary">
-          {selectedDay ? <>في <b className="numeric">{selectedDay}</b> فُتح التطبيق <strong className="numeric">{numberFormat.format(filteredHistory.length)}</strong> مرات</> : "اختر تاريخًا لعرض عدد مرات الفتح في ذلك اليوم."}
-        </div>
-        <div className="history-list">
-          {filteredHistory.length===0&&<p>{selectedDay ? "لا توجد جلسات في التاريخ المختار." : "لا توجد جلسات مكتملة بعد."}</p>}
-          {filteredHistory.map(item=><article className="history-row" key={item.key}>
-            <div><strong className="numeric">{dateFormat.format(item.start)}</strong><small className="numeric">هجريًا: {hijriDateFormat.format(item.start)}</small></div>
-            <div><span className="numeric">{timeFormat.format(item.start)} — {timeFormat.format(item.end)}</span><b className="numeric">{durationLabel(item.end.getTime()-item.start.getTime())}</b>{item.active&&<small>نشطة الآن</small>}</div>
-          </article>)}
-        </div>
-      </section>
-    </div>}
+  return <main className="app-shell"><header className="topbar"><div className="brand"><span>ت</span><div><strong>TAILOR</strong><small>إدارة التفصيل</small></div></div><div className="top-actions"><button type="button" onClick={()=>setView("settings")}>⚙ <span>الإعدادات</span></button><time className="numeric">{dateFormat.format(today)}</time></div></header>
+    {view==="dashboard"&&<div className="workspace"><aside className="side-menu side-right"><p className="side-label">القائمة الرئيسية</p><div className="side-cards">{rightMenu.map(([label,icon],index)=><MenuCard key={label} label={label} icon={icon} onSelect={index===0?()=>setView("add-customer"):undefined}/>)}</div></aside><section className="dashboard"><section className="greeting"><span>مساحة العمل</span><h1>مرحباً بك</h1><p>هذه نظرة اليوم على حركة التفصيل والتسليم.</p><time className="numeric">{dateFormat.format(today)}</time></section><section className="metric-grid" aria-live="polite"><article className="metric-card received"><span className="metric-icon">↓</span><p>القبض</p><strong className="numeric">{data?numberFormat.format(data.receivedToday):"—"}</strong></article><article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong className="numeric">{data?numberFormat.format(data.tailoredToday):"—"}</strong></article><article className="metric-card due"><span className="metric-icon">◷</span><p>موعودين اليوم</p><strong className="numeric">{data?numberFormat.format(data.dueToday):"—"}</strong></article></section><button className="session-card" type="button" onClick={()=>void showHistory()}><span className="session-kicker">سجل تشغيل التطبيق</span><span className="session-dates"><strong className="numeric">{dateFormat.format(today)}</strong><small className="numeric">هجريًا: {hijriDateFormat.format(today)}</small></span><span className="session-runtime"><small>فُتح التطبيق عند</small><strong className="numeric">{started?timeFormat.format(started):"—"}</strong><small>مدة التشغيل الحالية</small><b className="numeric">{elapsed}</b></span><span className="session-action">عرض سجل الأيام ←</span></button>{error&&<p className="error">{error}</p>}</section><aside className="side-menu side-left"><p className="side-label">متابعة المحل</p><div className="side-cards">{leftMenu.map(([label,icon])=><MenuCard key={label} label={label} icon={icon}/>)}</div></aside></div>}
+    {view==="add-customer"&&<section className="customer-workspace" dir="rtl"><div className="customer-page-head"><button className="page-close" type="button" onClick={closeCustomer} aria-label="إغلاق بدون حفظ">×</button><span>العملاء</span><h1>إضافة عميل جديد</h1><p>أدخل البيانات الأساسية للعميل، ثم احفظ للانتقال إلى فاتورته الجديدة.</p></div><form className="customer-form" onSubmit={event=>void saveCustomer(event)}><div className="customer-fields"><label><span>اسم العميل</span><input autoFocus value={customerName} onChange={event=>setCustomerName(event.target.value)} placeholder="اكتب الاسم الكامل" autoComplete="name"/></label><label><span>رقم الجوال</span><input className="numeric" type="tel" inputMode="numeric" dir="ltr" value={customerPhone} onChange={event=>setCustomerPhone(latinDigits(event.target.value).replace(/[^0-9+ -]/g,""))} placeholder="05XXXXXXXX" autoComplete="tel"/></label></div>{customerError&&<p className="customer-error" role="alert">{customerError}</p>}<div className="customer-actions"><button className="save-customer" type="submit" disabled={savingCustomer}>{savingCustomer?"جارٍ الحفظ…":"حفظ ومتابعة"}</button><button className="clear-customer" type="button" onClick={()=>{setCustomerName("");setCustomerPhone("");setCustomerError("")}}>مسح المدخلات</button><button className="cancel-customer" type="button" onClick={closeCustomer}>إغلاق بدون حفظ</button></div></form></section>}
+    {view==="order"&&currentCustomer&&<section className="order-page" dir="rtl"><div className="order-title"><div><span>فاتورة جديدة</span><h1>بيانات العميل والثوب</h1><p>لا توجد عبارة «مقاس قديم» لأن هذا عميل وفاتورة جديدان.</p></div><button type="button" onClick={()=>setView("dashboard")}>العودة للرئيسية</button></div><section className="order-card customer-summary"><div><span>اسم العميل</span><b>{currentCustomer.name}</b></div><div><span>رقم الجوال</span><b className="numeric">{currentCustomer.phone}</b></div><div><span>رقم العميل</span><b className="numeric">{currentCustomer.code}</b></div><label><span>وزن العميل</span><input className="numeric" disabled={orderLocked} value={weight} onChange={event=>setWeight(latinDigits(event.target.value))} placeholder="—"/></label><div><span>رقم الفاتورة</span><b className="numeric">{invoice?.invoiceNumber||"تُنشأ عند الحفظ"}</b></div><div><span>تاريخ ووقت التفصيل</span><b className="numeric">{invoice?`${shortDateFormat.format(databaseDate(invoice.createdAt))} ${timeFormat.format(databaseDate(invoice.createdAt))}`:`${shortDateFormat.format(today)} ${timeFormat.format(today)}`}</b></div><label><span>عدد الأيام</span><input className="numeric" disabled={orderLocked} value={dayCount} onChange={event=>setDayCount(latinDigits(event.target.value))}/></label><label><span>تاريخ التسليم الميلادي</span><input className="numeric" type="date" disabled={orderLocked} value={deliveryDate} onChange={event=>changeDeliveryDate(event.target.value)}/></label><label><span>إجمالي عدد الثياب</span><input className="numeric" disabled={orderLocked} value={totalThobes} onChange={event=>setTotalThobes(latinDigits(event.target.value))}/></label></section>
+      <section className="order-card"><div className="section-head"><div><span>01</span><h2>المقاسات</h2></div><div className="unit-switch"><button className={unit==="سم"?"selected":""} disabled={orderLocked} onClick={()=>setUnit("سم")}>سم</button><button className={unit==="إنش"?"selected":""} disabled={orderLocked} onClick={()=>setUnit("إنش")}>إنش</button></div></div><div className="measurement-inputs">{measurementFields.map(field=><label key={field}><span>{field}</span><div><input className="numeric" disabled={orderLocked} value={measurements[field]} onChange={event=>setMeasurements(current=>({...current,[field]:latinDigits(event.target.value)}))} placeholder="—"/><small>{unit}</small></div></label>)}</div></section>
+      <section className="order-card"><div className="section-head"><div><span>02</span><h2>القماش والجيب</h2></div></div><div className="fabric-inputs">{fabricFields.map(field=><label key={field}><span>{field}</span><input className={field.includes("اسم")?"":"numeric"} disabled={orderLocked} value={fabric[field]} onChange={event=>setFabric(current=>({...current,[field]:field.includes("اسم")?event.target.value:latinDigits(event.target.value)}))} placeholder="—"/></label>)}</div><div className="detail-inputs"><label><span>نوع التفصيل</span><select disabled={orderLocked} value={thobeType} onChange={event=>setThobeType(event.target.value)}><option>سعودي</option><option>قطري</option><option>كويتي</option><option>إماراتي</option></select></label><label className="wide"><span>ملاحظة</span><textarea disabled={orderLocked} value={notes} onChange={event=>setNotes(event.target.value)} placeholder="أي تعليمات خاصة للخياط"/></label></div></section>
+      <section className="order-card"><div className="section-head"><div><span>03</span><h2>صور وتفاصيل الثوب</h2></div><button type="button" onClick={()=>setView("settings")}>إدارة الأنواع من الإعدادات</button></div><p className="section-note">لا توجد صور جاهزة في النظام. كل صورة واسم هنا تأتي فقط مما تضيفه أنت في الإعدادات.</p><div className="design-grid">{categories.map(category=>{const option=selectedDesigns[category];return <button className={`design-card ${option?"chosen":""}`} type="button" disabled={orderLocked} key={category} onClick={()=>setPickerCategory(category)}>{option?<img src={option.imageData} alt={option.name}/>:<span className="empty-design">＋</span>}<span>{category}</span><b>{option?.name||(category==="السحب"?"فارغ — اضغط لاختيار السحب":"اضغط لاختيار النوع")}</b></button>})}</div></section>
+      <section className="order-card"><div className="section-head"><div><span>04</span><h2>الحساب والدفع</h2></div></div><div className="finance-inputs"><label><span>إجمالي السعر</span><input className="numeric" disabled={orderLocked} value={totalPrice} onChange={event=>setTotalPrice(latinDigits(event.target.value))}/></label><label><span>نوع الدفع</span><select disabled={orderLocked} value={paymentMethod} onChange={event=>setPaymentMethod(event.target.value)}><option>كاش</option><option>شبكة</option><option>تحويل</option></select></label><label><span>المدفوع الآن</span><input className="numeric" disabled={orderLocked} value={paidAmount} onChange={event=>setPaidAmount(latinDigits(event.target.value))}/></label><label><span>الخصم</span><input className="numeric" disabled={orderLocked} value={discount} onChange={event=>setDiscount(latinDigits(event.target.value))}/></label><div className="remaining"><span>المتبقي</span><b className="numeric">{numberFormat.format(remaining)} ر.س</b></div></div></section>
+      <section className="order-actions"><button className="primary-action" type="button" disabled={savingInvoice||orderLocked} onClick={()=>void saveInvoice()}>{savingInvoice?"جارٍ الحفظ…":"حفظ الفاتورة"}</button><button type="button" disabled={!invoice||!orderLocked} onClick={()=>{setOrderLocked(false);setOrderMessage("وضع التعديل مفتوح")}}>تعديل</button><button type="button" onClick={()=>printSheet("receipt")}>طباعة فاتورة العميل الحرارية</button><button type="button" onClick={()=>setPreviewOpen(true)}>معاينة المقاسات A5</button><button type="button" onClick={()=>printSheet("measurements")}>طباعة المقاسات A5</button><button type="button" onClick={resetInvoice}>فاتورة جديدة لنفس العميل</button>{orderMessage&&<p>{orderMessage}</p>}</section></section>}
+    {view==="settings"&&<section className="settings-page" dir="rtl"><div className="settings-title"><div><span>الإعدادات</span><h1>مكتبة أشكال الثوب</h1><p>أضف صورك أنت من الكمبيوتر. لن يضيف النظام أي شكل جاهز.</p></div><button type="button" onClick={()=>setView(currentCustomer?"order":"dashboard")}>رجوع</button></div><div className="settings-layout"><form className="option-form" onSubmit={event=>void addDesignOption(event)}><h2>إضافة نوع جديد</h2><label><span>القسم</span><input list="category-list" value={settingsCategory} onChange={event=>setSettingsCategory(event.target.value)}/><datalist id="category-list">{categories.map(category=><option key={category} value={category}/>)}</datalist></label><label><span>اسم النوع</span><input value={optionName} onChange={event=>setOptionName(event.target.value)} placeholder="مثال: قلاب ملكي"/></label><label className="image-upload"><span>صورة النوع</span><input type="file" accept="image/*" onChange={event=>void selectImage(event)}/>{optionImage?<img src={optionImage} alt="معاينة الصورة"/>:<b>اختر صورة محفوظة في الكمبيوتر</b>}</label>{settingsError&&<p>{settingsError}</p>}<button className="save-option" type="submit">حفظ النوع والصورة</button></form><section className="option-library"><div className="category-tabs">{categories.map(category=><button className={settingsCategory===category?"selected":""} type="button" key={category} onClick={()=>setSettingsCategory(category)}>{category}</button>)}</div><div className="option-cards">{designOptions.filter(option=>option.category===settingsCategory).length===0&&<p>لا توجد أنواع في هذا القسم حتى الآن.</p>}{designOptions.filter(option=>option.category===settingsCategory).map(option=><article key={option.id}><img src={option.imageData} alt={option.name}/><div><b>{option.name}</b><small>{option.category}</small></div><button type="button" onClick={()=>void deleteDesignOption(option.id)}>حذف</button></article>)}</div></section></div></section>}
+    {pickerCategory&&<div className="picker-overlay" onMouseDown={()=>setPickerCategory(null)}><section className="picker-dialog" dir="rtl" onMouseDown={event=>event.stopPropagation()}><header><div><span>اختيار النوع</span><h2>{pickerCategory}</h2></div><button type="button" onClick={()=>setPickerCategory(null)}>×</button></header><div className="picker-options">{designOptions.filter(option=>option.category===pickerCategory).length===0&&<div className="picker-empty"><p>لا توجد صور مضافة لهذا القسم.</p><button type="button" onClick={()=>{setSettingsCategory(pickerCategory);setPickerCategory(null);setView("settings")}}>إضافتها من الإعدادات</button></div>}{designOptions.filter(option=>option.category===pickerCategory).map(option=><button type="button" key={option.id} onClick={()=>{setSelectedDesigns(current=>({...current,[pickerCategory]:option}));setPickerCategory(null)}}><img src={option.imageData} alt={option.name}/><b>{option.name}</b></button>)}</div>{selectedDesigns[pickerCategory]&&<button className="remove-choice" type="button" onClick={()=>{setSelectedDesigns(current=>({...current,[pickerCategory]:undefined}));setPickerCategory(null)}}>إلغاء اختيار هذا القسم</button>}</section></div>}
+    {previewOpen&&sheetProps&&<div className="preview-overlay" onMouseDown={()=>setPreviewOpen(false)}><section className="preview-dialog" onMouseDown={event=>event.stopPropagation()}><div className="preview-tools"><b>معاينة ورقة A5</b><button type="button" onClick={()=>printSheet("measurements")}>طباعة</button><button type="button" onClick={()=>setPreviewOpen(false)}>إغلاق</button></div><MeasurementSheet {...sheetProps}/></section></div>}
+    {view==="dashboard"&&historyOpen&&<div className="history-overlay" role="presentation" onMouseDown={()=>setHistoryOpen(false)}><section className="history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title" onMouseDown={event=>event.stopPropagation()}><div className="history-head"><div><span>تشغيل التطبيق</span><h2 id="history-title">سجل أوقات التشغيل</h2></div><label className="history-filter"><span>ابحث بالتاريخ الميلادي</span><input className="numeric" type="date" lang="ar-SA-u-ca-gregory-nu-latn" value={selectedDay} onChange={event=>setSelectedDay(event.target.value)}/></label><button type="button" onClick={()=>setHistoryOpen(false)} aria-label="إغلاق">×</button></div><div className="history-summary">{selectedDay?<>في <b className="numeric">{selectedDay}</b> فُتح التطبيق <strong className="numeric">{numberFormat.format(filteredHistory.length)}</strong> مرات</>:"اختر تاريخًا لعرض عدد مرات الفتح في ذلك اليوم."}</div><div className="history-list">{filteredHistory.length===0&&<p>{selectedDay?"لا توجد جلسات في التاريخ المختار.":"لا توجد جلسات مكتملة بعد."}</p>}{filteredHistory.map(item=><article className="history-row" key={item.key}><div><strong className="numeric">{dateFormat.format(item.start)}</strong><small className="numeric">هجريًا: {hijriDateFormat.format(item.start)}</small></div><div><span className="numeric">{timeFormat.format(item.start)} — {timeFormat.format(item.end)}</span><b className="numeric">{durationLabel(item.end.getTime()-item.start.getTime())}</b>{item.active&&<small>نشطة الآن</small>}</div></article>)}</div></section></div>}
+    <div className="print-area">{sheetProps&&<MeasurementSheet {...sheetProps}/>} {currentCustomer&&<ReceiptSheet customer={currentCustomer} invoice={invoice} total={total} paid={paid} discount={discountValue} remaining={remaining} paymentMethod={paymentMethod}/>}</div>
   </main>;
 }
