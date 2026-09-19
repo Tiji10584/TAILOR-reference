@@ -1,25 +1,30 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Dashboard = { receivedToday:number; tailoredToday:number; dueToday:number };
 type CurrentSession = { startedAt:string };
 type SessionEntry = { startedAt:string; endedAt:string };
+type DisplaySession = { start:Date; end:Date; active:boolean; key:string };
 
-const dateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory",{
-  weekday:"long", day:"numeric", month:"long", year:"numeric",
+const dateFormat = new Intl.DateTimeFormat("en-GB",{
+  weekday:"long", day:"2-digit", month:"short", year:"numeric",
 });
-const hijriDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura",{
-  day:"numeric", month:"long", year:"numeric",
+const hijriDateFormat = new Intl.DateTimeFormat("en-GB-u-ca-islamic-umalqura",{
+  day:"2-digit", month:"short", year:"numeric",
 });
-const timeFormat = new Intl.DateTimeFormat("ar-SA",{hour:"numeric",minute:"2-digit",hour12:true});
+const timeFormat = new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false});
+const numberFormat = new Intl.NumberFormat("en-US",{useGrouping:false});
 
 function databaseDate(value:string){return new Date(value.replace(" ","T"));}
+function dayKey(date:Date){
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
 function durationLabel(milliseconds:number){
   const totalMinutes=Math.max(0,Math.floor(milliseconds/60000));
   const hours=Math.floor(totalMinutes/60);
   const minutes=totalMinutes%60;
-  if(hours===0)return `${minutes} دقيقة`;
-  return `${hours} ساعة${minutes ? ` و ${minutes} دقيقة` : ""}`;
+  if(hours===0)return `${numberFormat.format(minutes)} دقيقة`;
+  return `${numberFormat.format(hours)} ساعة${minutes ? ` و ${numberFormat.format(minutes)} دقيقة` : ""}`;
 }
 
 type IconName = "person"|"search"|"whatsapp"|"finance"|"supplier"|"income"|"delivery"|"notes"|"report"|"access"|"inventory";
@@ -71,6 +76,7 @@ export default function App(){
   const [session,setSession]=useState<CurrentSession|null>(null);
   const [history,setHistory]=useState<SessionEntry[]>([]);
   const [historyOpen,setHistoryOpen]=useState(false);
+  const [selectedDay,setSelectedDay]=useState("");
   const [now,setNow]=useState(Date.now());
   const [error,setError]=useState("");
 
@@ -101,11 +107,22 @@ export default function App(){
   const today=new Date();
   const started=session ? databaseDate(session.startedAt) : null;
   const elapsed=started ? durationLabel(now-started.getTime()) : "—";
+  const displayHistory=useMemo<DisplaySession[]>(()=>{
+    const saved=history.map((item,index)=>({
+      start:databaseDate(item.startedAt),
+      end:databaseDate(item.endedAt),
+      active:false,
+      key:`${item.startedAt}-${index}`,
+    }));
+    if(started)saved.unshift({start:started,end:new Date(now),active:true,key:`active-${session?.startedAt}`});
+    return saved;
+  },[history,now,session?.startedAt,started]);
+  const filteredHistory=selectedDay ? displayHistory.filter(item=>dayKey(item.start)===selectedDay) : displayHistory;
 
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><span>ت</span><div><strong>TAILOR</strong><small>إدارة التفصيل</small></div></div>
-      <time>{dateFormat.format(today)}</time>
+      <time className="numeric">{dateFormat.format(today)}</time>
     </header>
 
     <div className="workspace">
@@ -119,28 +136,28 @@ export default function App(){
           <span>مساحة العمل</span>
           <h1>مرحباً بك</h1>
           <p>هذه نظرة اليوم على حركة التفصيل والتسليم.</p>
-          <time>{dateFormat.format(today)}</time>
+          <time className="numeric">{dateFormat.format(today)}</time>
         </section>
 
         <section className="metric-grid" aria-live="polite">
-          <article className="metric-card received"><span className="metric-icon">↓</span><p>القبض</p><strong>{data?.receivedToday??"—"}</strong></article>
-          <article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong>{data?.tailoredToday??"—"}</strong></article>
-          <article className="metric-card due"><span className="metric-icon">◷</span><p>موعودين اليوم</p><strong>{data?.dueToday??"—"}</strong></article>
+          <article className="metric-card received"><span className="metric-icon">↓</span><p>القبض</p><strong className="numeric">{data ? numberFormat.format(data.receivedToday) : "—"}</strong></article>
+          <article className="metric-card tailored"><span className="metric-icon">✦</span><p>تم تفصيلها اليوم</p><strong className="numeric">{data ? numberFormat.format(data.tailoredToday) : "—"}</strong></article>
+          <article className="metric-card due"><span className="metric-icon">◷</span><p>موعودين اليوم</p><strong className="numeric">{data ? numberFormat.format(data.dueToday) : "—"}</strong></article>
         </section>
 
         <button className="session-card" type="button" onClick={()=>void showHistory()}>
           <span className="session-kicker">سجل تشغيل التطبيق</span>
           <span className="session-dates">
-            <strong>{dateFormat.format(today)}</strong>
-            <small>هجريًا: {hijriDateFormat.format(today)}</small>
+            <strong className="numeric">{dateFormat.format(today)}</strong>
+            <small className="numeric">Hijri: {hijriDateFormat.format(today)}</small>
           </span>
           <span className="session-runtime">
             <small>فُتح التطبيق عند</small>
-            <strong>{started ? timeFormat.format(started) : "—"}</strong>
+            <strong className="numeric">{started ? timeFormat.format(started) : "—"}</strong>
             <small>مدة التشغيل الحالية</small>
-            <b>{elapsed}</b>
+            <b className="numeric">{elapsed}</b>
           </span>
-          <span className="session-action">اضغط لعرض سجل الأيام ←</span>
+          <span className="session-action">عرض سجل الأيام ←</span>
         </button>
 
         {error&&<p className="error">{error}</p>}
@@ -156,18 +173,21 @@ export default function App(){
       <section className="history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title" onMouseDown={event=>event.stopPropagation()}>
         <div className="history-head">
           <div><span>تشغيل التطبيق</span><h2 id="history-title">سجل أوقات التشغيل</h2></div>
+          <label className="history-filter">
+            <span>ابحث بالتاريخ</span>
+            <input className="numeric" type="date" lang="en" value={selectedDay} onChange={event=>setSelectedDay(event.target.value)}/>
+          </label>
           <button type="button" onClick={()=>setHistoryOpen(false)} aria-label="إغلاق">×</button>
         </div>
+        <div className="history-summary">
+          {selectedDay ? <>في <b className="numeric">{selectedDay}</b> فُتح التطبيق <strong className="numeric">{numberFormat.format(filteredHistory.length)}</strong> مرات</> : "اختر تاريخًا لعرض عدد مرات الفتح في ذلك اليوم."}
+        </div>
         <div className="history-list">
-          {history.length===0&&<p>لا توجد جلسات مكتملة بعد. تُحفظ الجلسة عند إغلاق التطبيق.</p>}
-          {history.map((item,index)=>{
-            const start=databaseDate(item.startedAt);
-            const end=databaseDate(item.endedAt);
-            return <article className="history-row" key={`${item.startedAt}-${index}`}>
-              <div><strong>{dateFormat.format(start)}</strong><small>هجريًا: {hijriDateFormat.format(start)}</small></div>
-              <div><span>{timeFormat.format(start)} — {timeFormat.format(end)}</span><b>{durationLabel(end.getTime()-start.getTime())}</b></div>
-            </article>;
-          })}
+          {filteredHistory.length===0&&<p>{selectedDay ? "لا توجد جلسات في التاريخ المختار." : "لا توجد جلسات مكتملة بعد."}</p>}
+          {filteredHistory.map(item=><article className="history-row" key={item.key}>
+            <div><strong className="numeric">{dateFormat.format(item.start)}</strong><small className="numeric">Hijri: {hijriDateFormat.format(item.start)}</small></div>
+            <div><span className="numeric">{timeFormat.format(item.start)} — {timeFormat.format(item.end)}</span><b className="numeric">{durationLabel(item.end.getTime()-item.start.getTime())}</b>{item.active&&<small>نشطة الآن</small>}</div>
+          </article>)}
         </div>
       </section>
     </div>}
