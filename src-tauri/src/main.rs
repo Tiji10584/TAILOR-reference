@@ -166,8 +166,9 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
-  UPDATE invoices SET invoice_number='__invoice_' || id;
-  UPDATE invoices SET invoice_number=CAST(id AS TEXT);
+ UPDATE invoices SET invoice_number='__invoice_' || id;
+ UPDATE invoices SET invoice_number=CAST(id AS TEXT);
+  UPDATE design_options SET category='الكبك' WHERE category='الكباك';
  ").map_err(|e|e.to_string())?;
  Ok(conn)
 }
