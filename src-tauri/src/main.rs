@@ -20,6 +20,12 @@ struct Customer{id:i64,code:String,name:String,phone:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
+struct CustomerSearchItem{
+ id:i64,code:String,name:String,phone:String,invoice_count:i64,last_invoice_at:String
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 struct DesignOption{id:i64,category:String,name:String,image_data:String}
 
 #[derive(Deserialize)]
@@ -33,6 +39,15 @@ struct InvoicePayload{
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct InvoiceRecord{id:i64,invoice_number:String,created_at:String}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct SavedInvoice{
+ id:i64,invoice_number:String,customer_id:i64,created_at:String,weight:String,
+ delivery_date:String,day_count:i64,total_thobes:i64,total_price:String,
+ paid_amount:String,payment_method:String,discount:String,notes:String,
+ measurements_json:String,fabric_json:String,designs_json:String,details_json:String
+}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -282,6 +297,46 @@ fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,Stri
 }
 
 #[tauri::command]
+fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,String>{
+ let conn=db(&app)?;
+ let query=query.trim().to_string();
+ let pattern=format!("%{}%",query);
+ let mut statement=conn.prepare(
+  "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),'')
+   FROM customers c
+   LEFT JOIN invoices i ON i.customer_id=c.id
+   WHERE ?1='' OR c.name LIKE ?2 COLLATE NOCASE OR c.customer_code LIKE ?2 OR c.phone LIKE ?2
+   GROUP BY c.id,c.customer_code,c.name,c.phone
+   ORDER BY CAST(c.customer_code AS INTEGER) DESC,c.id DESC
+   LIMIT 200"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map(params![&query,&pattern],|row|Ok(CustomerSearchItem{
+  id:row.get(0)?,code:row.get(1)?,name:row.get(2)?,phone:row.get(3)?,
+  invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn customer_invoices(app:AppHandle,customer_id:i64)->Result<Vec<SavedInvoice>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare(
+  "SELECT id,invoice_number,customer_id,created_at,weight,delivery_date,day_count,total_thobes,
+          total_price,paid_amount,payment_method,discount,notes,measurements_json,fabric_json,
+          designs_json,details_json
+   FROM invoices WHERE customer_id=?1 ORDER BY datetime(created_at) DESC,id DESC"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map([customer_id],|row|Ok(SavedInvoice{
+  id:row.get(0)?,invoice_number:row.get(1)?,customer_id:row.get(2)?,created_at:row.get(3)?,
+  weight:row.get(4)?,delivery_date:row.get(5)?,day_count:row.get(6)?,total_thobes:row.get(7)?,
+  total_price:row.get(8)?,paid_amount:row.get(9)?,payment_method:row.get(10)?,discount:row.get(11)?,
+  notes:row.get(12)?,measurements_json:row.get(13)?,fabric_json:row.get(14)?,
+  designs_json:row.get(15)?,details_json:row.get(16)?,
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
 fn list_design_options(app:AppHandle)->Result<Vec<DesignOption>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare("SELECT id,category,name,image_data FROM design_options ORDER BY category,name,id").map_err(|e|e.to_string())?;
@@ -364,7 +419,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history,storage_info,set_storage_location,create_customer,list_design_options,add_design_option,delete_design_option,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
