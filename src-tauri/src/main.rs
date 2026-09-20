@@ -298,6 +298,25 @@ fn advance_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
 }
 
 #[tauri::command]
+fn retreat_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
+ let conn=db(&app)?;
+ let current:String=conn.query_row("SELECT work_status FROM orders WHERE id=?1",[order_id],|row|row.get(0)).map_err(|_|"تعذر العثور على طلب الثوب".to_string())?;
+ let previous=match current.as_str(){
+  "انتظار القص"=>return Ok(()),
+  "عند الخياط"=>"انتظار القص",
+  "في المغسلة"=>"عند الخياط",
+  "في المحل بانتظار التسليم"=>"في المغسلة",
+  "تم التسليم"=>"في المحل بانتظار التسليم",
+  _=>return Err("حالة الثوب غير معروفة".into()),
+ };
+ conn.execute(
+  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN work_status='في المغسلة' AND ?1='عند الخياط' THEN NULL ELSE tailored_date END WHERE id=?2",
+  params![previous,order_id]
+ ).map_err(|e|e.to_string())?;
+ Ok(())
+}
+
+#[tauri::command]
 fn current_session(app:AppHandle)->Result<CurrentSession,String>{
  let conn=db(&app)?;
  conn.query_row(
@@ -477,7 +496,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
