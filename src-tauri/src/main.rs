@@ -27,7 +27,7 @@ struct Customer{id:i64,code:String,name:String,phone:String}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct CustomerSearchItem{
- id:i64,code:String,name:String,phone:String,invoice_count:i64,last_invoice_at:String
+ id:i64,code:String,name:String,phone:String,invoice_count:i64,last_invoice_at:String,outstanding:f64
 }
 
 #[derive(Serialize)]
@@ -36,7 +36,11 @@ struct DesignOption{id:i64,category:String,name:String,image_data:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct Supplier{id:i64,name:String,phone:String,notes:String,fabric_count:i64,created_at:String}
+struct Supplier{id:i64,name:String,phone:String,notes:String,fabric_count:i64,total_paid:f64,created_at:String}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct SupplierPayment{id:i64,supplier_id:i64,supplier_name:String,amount:f64,payment_method:String,notes:String,created_at:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -72,19 +76,20 @@ struct DebtInvoice{invoice_id:i64,invoice_number:String,customer_name:String,pho
 #[serde(rename_all="camelCase")]
 struct FinancialOverview{
  today_sales:f64,today_received:f64,today_extra_income:f64,today_expenses:f64,total_outstanding:f64,
+ month_sales:f64,month_received:f64,month_extra_income:f64,month_expenses:f64,
  entries:Vec<FinancialEntry>,debts:Vec<DebtInvoice>
 }
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct DailyReport{
- report_date:String,new_customers:i64,invoices:i64,thobes:i64,invoice_sales:f64,invoice_received:f64,
+ report_date:String,period:String,period_label:String,new_customers:i64,invoices:i64,thobes:i64,invoice_sales:f64,invoice_received:f64,
  extra_income:f64,expenses:f64,delivered:i64,fabric_used:f64,fabric_sold:f64
 }
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool}
+struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool,theme:String}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -302,6 +307,15 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    payment_method TEXT NOT NULL DEFAULT 'كاش',
    created_at TEXT NOT NULL,
    FOREIGN KEY(invoice_id) REFERENCES invoices(id)
+  );
+  CREATE TABLE IF NOT EXISTS supplier_payments(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   supplier_id INTEGER NOT NULL,
+   amount REAL NOT NULL,
+   payment_method TEXT NOT NULL DEFAULT 'كاش',
+   notes TEXT NOT NULL DEFAULT '',
+   created_at TEXT NOT NULL,
+   FOREIGN KEY(supplier_id) REFERENCES suppliers(id)
   );
   CREATE TABLE IF NOT EXISTS app_settings(
    setting_key TEXT PRIMARY KEY,
@@ -537,7 +551,8 @@ fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,
  let prefix_pattern=format!("{}%",escaped);
  let word_prefix_pattern=format!("% {}%",escaped);
  let mut statement=conn.prepare(
-  "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),'')
+  "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),''),
+          COALESCE(SUM(MAX(0,CAST(NULLIF(i.total_price,'') AS REAL)-CAST(NULLIF(i.paid_amount,'') AS REAL)-CAST(NULLIF(i.discount,'') AS REAL))),0)
    FROM customers c
    LEFT JOIN invoices i ON i.customer_id=c.id
    WHERE ?1=''
@@ -557,7 +572,7 @@ fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map(params![&query,&contains_pattern,&prefix_pattern,&word_prefix_pattern],|row|Ok(CustomerSearchItem{
   id:row.get(0)?,code:row.get(1)?,name:row.get(2)?,phone:row.get(3)?,
-  invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,
+  invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,outstanding:row.get(6)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
@@ -614,13 +629,14 @@ fn delete_design_option(app:AppHandle,id:i64)->Result<(),String>{
 fn list_suppliers(app:AppHandle)->Result<Vec<Supplier>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
-  "SELECT s.id,s.name,s.phone,s.notes,COUNT(f.id),s.created_at
+  "SELECT s.id,s.name,s.phone,s.notes,COUNT(f.id),
+          COALESCE((SELECT SUM(p.amount) FROM supplier_payments p WHERE p.supplier_id=s.id),0),s.created_at
    FROM suppliers s LEFT JOIN fabrics f ON f.supplier_id=s.id
    GROUP BY s.id,s.name,s.phone,s.notes,s.created_at ORDER BY s.id DESC"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|Ok(Supplier{
   id:row.get(0)?,name:row.get(1)?,phone:row.get(2)?,notes:row.get(3)?,
-  fabric_count:row.get(4)?,created_at:row.get(5)?,
+  fabric_count:row.get(4)?,total_paid:row.get(5)?,created_at:row.get(6)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
@@ -635,6 +651,41 @@ fn add_supplier(app:AppHandle,name:String,phone:String,notes:String)->Result<i64
   params![name,phone.trim(),notes.trim()]
  ).map_err(|e|e.to_string())?;
  Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+fn list_supplier_payments(app:AppHandle,supplier_id:Option<i64>)->Result<Vec<SupplierPayment>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare(
+  "SELECT p.id,p.supplier_id,s.name,p.amount,p.payment_method,p.notes,p.created_at
+   FROM supplier_payments p JOIN suppliers s ON s.id=p.supplier_id
+   WHERE ?1 IS NULL OR p.supplier_id=?1 ORDER BY p.id DESC LIMIT 200"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map([supplier_id],|row|Ok(SupplierPayment{
+  id:row.get(0)?,supplier_id:row.get(1)?,supplier_name:row.get(2)?,amount:row.get(3)?,
+  payment_method:row.get(4)?,notes:row.get(5)?,created_at:row.get(6)?,
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn add_supplier_payment(app:AppHandle,supplier_id:i64,amount:f64,payment_method:String,notes:String)->Result<SupplierPayment,String>{
+ if !amount.is_finite()||amount<=0.0{return Err("أدخل مبلغ الدفعة".into())}
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let supplier_name:String=transaction.query_row("SELECT name FROM suppliers WHERE id=?1",[supplier_id],|row|row.get(0)).map_err(|_|"المورد غير موجود".to_string())?;
+ transaction.execute(
+  "INSERT INTO supplier_payments(supplier_id,amount,payment_method,notes,created_at) VALUES(?1,?2,?3,?4,datetime('now','localtime'))",
+  params![supplier_id,amount,payment_method.trim(),notes.trim()]
+ ).map_err(|e|e.to_string())?;
+ let id=transaction.last_insert_rowid();
+ transaction.execute(
+  "INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at) VALUES('دفعة مورد',?1,?2,?3,datetime('now','localtime'))",
+  params![format!("دفعة للمورد {}",supplier_name),amount,payment_method.trim()]
+ ).map_err(|e|e.to_string())?;
+ let created_at:String=transaction.query_row("SELECT created_at FROM supplier_payments WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())?;
+ Ok(SupplierPayment{id,supplier_id,supplier_name,amount,payment_method,notes,created_at})
 }
 
 #[tauri::command]
@@ -778,7 +829,13 @@ fn financial_overview(app:AppHandle)->Result<FinancialOverview,String>{
  let registered_extra:f64=conn.query_row("SELECT COALESCE(SUM(total_price),0) FROM extra_transactions WHERE date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let today_extra_income=registered_extra+manual_income;
- let today_expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='مصروف' AND date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let today_expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type IN ('مصروف','دفعة مورد') AND date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let month_sales=conn.query_row("SELECT COALESCE(SUM(CAST(NULLIF(total_price,'') AS REAL)),0) FROM invoices WHERE date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let month_received:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دفعة فاتورة' AND date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let month_registered_extra:f64=conn.query_row("SELECT COALESCE(SUM(total_price),0) FROM extra_transactions WHERE date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let month_manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let month_extra_income=month_registered_extra+month_manual_income;
+ let month_expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type IN ('مصروف','دفعة مورد') AND date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let total_outstanding=conn.query_row("SELECT COALESCE(SUM(MAX(0,CAST(NULLIF(total_price,'') AS REAL)-CAST(NULLIF(paid_amount,'') AS REAL)-CAST(NULLIF(discount,'') AS REAL))),0) FROM invoices",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let entries={
   let mut statement=conn.prepare("SELECT id,entry_type,description,amount,payment_method,created_at FROM financial_entries ORDER BY id DESC LIMIT 100").map_err(|e|e.to_string())?;
@@ -794,7 +851,7 @@ fn financial_overview(app:AppHandle)->Result<FinancialOverview,String>{
   }).map_err(|e|e.to_string())?;
   rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?.into_iter().filter(|item|item.remaining>0.0001).collect()
  };
- Ok(FinancialOverview{today_sales,today_received,today_extra_income,today_expenses,total_outstanding,entries,debts})
+ Ok(FinancialOverview{today_sales,today_received,today_extra_income,today_expenses,total_outstanding,month_sales,month_received,month_extra_income,month_expenses,entries,debts})
 }
 
 #[tauri::command]
@@ -825,20 +882,27 @@ fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method
 }
 
 #[tauri::command]
-fn daily_report(app:AppHandle,report_date:String)->Result<DailyReport,String>{
+fn daily_report(app:AppHandle,report_date:String,period:String)->Result<DailyReport,String>{
  let conn=db(&app)?;let day=report_date.trim();
  if day.is_empty(){return Err("اختر تاريخ التقرير".into())}
- let new_customers=conn.query_row("SELECT COUNT(*) FROM customers WHERE date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- let (invoices,thobes,invoice_sales):(i64,i64,f64)=conn.query_row("SELECT COUNT(*),COALESCE(SUM(total_thobes),0),COALESCE(SUM(CAST(NULLIF(total_price,'') AS REAL)),0) FROM invoices WHERE date(created_at)=date(?1)",[day],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(|e|e.to_string())?;
- let invoice_received:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دفعة فاتورة' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- let registered_extra:f64=conn.query_row("SELECT COALESCE(SUM(total_price),0) FROM extra_transactions WHERE date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- let manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ if day.len()<10{return Err("تاريخ التقرير غير صحيح".into())}
+ let (start,end,period_label)=match period.as_str(){
+  "شهري"=>(format!("{}-01",&day[..7]),"month".to_string(),"تقرير مالي شهري".to_string()),
+  "سنوي"=>(format!("{}-01-01",&day[..4]),"year".to_string(),"تقرير مالي سنوي".to_string()),
+  _=>(day.to_string(),"day".to_string(),"تقرير مالي يومي".to_string()),
+ };
+ let end_date=match end.as_str(){"month"=>conn.query_row("SELECT date(?1,'+1 month')",[&start],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?,"year"=>conn.query_row("SELECT date(?1,'+1 year')",[&start],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?,_=>conn.query_row("SELECT date(?1,'+1 day')",[&start],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?};
+ let new_customers=conn.query_row("SELECT COUNT(*) FROM customers WHERE date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let (invoices,thobes,invoice_sales):(i64,i64,f64)=conn.query_row("SELECT COUNT(*),COALESCE(SUM(total_thobes),0),COALESCE(SUM(CAST(NULLIF(total_price,'') AS REAL)),0) FROM invoices WHERE date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(|e|e.to_string())?;
+ let invoice_received:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دفعة فاتورة' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let registered_extra:f64=conn.query_row("SELECT COALESCE(SUM(total_price),0) FROM extra_transactions WHERE date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
  let extra_income=registered_extra+manual_income;
- let expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='مصروف' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- let delivered=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE work_status='تم التسليم' AND date(delivered_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- let fabric_used=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='تفصيل ثوب' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- let fabric_sold=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='بيع قماش' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
- Ok(DailyReport{report_date:day.into(),new_customers,invoices,thobes,invoice_sales,invoice_received,extra_income,expenses,delivered,fabric_used,fabric_sold})
+ let expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type IN ('مصروف','دفعة مورد') AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let delivered=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE work_status='تم التسليم' AND date(delivered_at)>=date(?1) AND date(delivered_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let fabric_used=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='تفصيل ثوب' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let fabric_sold=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='بيع قماش' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
+ Ok(DailyReport{report_date:day.into(),period,period_label,new_customers,invoices,thobes,invoice_sales,invoice_received,extra_income,expenses,delivered,fabric_used,fabric_sold})
 }
 
 #[tauri::command]
@@ -846,7 +910,8 @@ fn get_app_settings(app:AppHandle)->Result<AppSettings,String>{
  let conn=db(&app)?;
  let value=|key:&str|->String{conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key=?1",[key],|row|row.get(0)).unwrap_or_default()};
  let finance_pin=value("finance_pin");
- Ok(AppSettings{shop_name:value("shop_name"),owner_name:value("owner_name"),finance_pin_set:!finance_pin.is_empty()})
+ let saved_theme=value("theme");
+ Ok(AppSettings{shop_name:value("shop_name"),owner_name:value("owner_name"),finance_pin_set:!finance_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()}})
 }
 
 #[tauri::command]
@@ -870,6 +935,14 @@ fn verify_finance_pin(app:AppHandle,pin:String)->Result<bool,String>{
  let conn=db(&app)?;
  let saved:String=conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key='finance_pin'",[],|row|row.get(0)).unwrap_or_default();
  Ok(saved.is_empty()||saved==pin.trim())
+}
+
+#[tauri::command]
+fn save_theme(app:AppHandle,theme:String)->Result<AppSettings,String>{
+ let value=if theme=="light"{"light"}else{"dark"};
+ let conn=db(&app)?;
+ conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('theme',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[value]).map_err(|e|e.to_string())?;
+ get_app_settings(app)
 }
 
 #[tauri::command]
@@ -1050,7 +1123,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,verify_finance_pin,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,verify_finance_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
