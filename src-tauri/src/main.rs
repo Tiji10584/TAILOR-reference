@@ -105,6 +105,12 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"delivery_date")?{
   conn.execute("ALTER TABLE orders ADD COLUMN delivery_date TEXT",[]).map_err(|e|e.to_string())?;
  }
+ conn.execute_batch("
+  UPDATE customers SET customer_code='__customer_' || id;
+  UPDATE customers SET customer_code=CAST(id AS TEXT);
+  UPDATE invoices SET invoice_number='__invoice_' || id;
+  UPDATE invoices SET invoice_number=CAST(id AS TEXT);
+ ").map_err(|e|e.to_string())?;
  Ok(conn)
 }
 
@@ -177,7 +183,7 @@ fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,Stri
   params![&name,&phone]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
- let code=format!("A{id}");
+ let code=id.to_string();
  transaction.execute("UPDATE customers SET customer_code=?1 WHERE id=?2",params![&code,id]).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
  Ok(Customer{id,code,name,phone})
@@ -239,7 +245,7 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
   params![order_id,payload.customer_id,&payload.weight,&payload.delivery_date,payload.day_count,payload.total_thobes,&payload.total_price,&payload.paid_amount,&payload.payment_method,&payload.discount,&payload.notes,&payload.measurements_json,&payload.fabric_json,&payload.designs_json,&payload.details_json]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
- let invoice_number=format!("INV-{id:06}");
+ let invoice_number=id.to_string();
  transaction.execute("UPDATE invoices SET invoice_number=?1 WHERE id=?2",params![&invoice_number,id]).map_err(|e|e.to_string())?;
  let created_at:String=transaction.query_row("SELECT created_at FROM invoices WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
