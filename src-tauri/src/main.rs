@@ -320,11 +320,11 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"orders","delivered_at")?{
   conn.execute("ALTER TABLE orders ADD COLUMN delivered_at TEXT",[]).map_err(|e|e.to_string())?;
  }
- if !has_column(&conn,"fabric_movements","entry_unit")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN entry_unit TEXT NOT NULL DEFAULT 'متر'",[]).map_err(|e|e.to_string())?}
- if !has_column(&conn,"fabric_movements","carton_count")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN carton_count REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
- if !has_column(&conn,"fabric_movements","meters_per_carton")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN meters_per_carton REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
- if !has_column(&conn,"fabric_movements","total_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN total_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
- if !has_column(&conn,"fabric_movements","unit_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
+ if !has_column(&conn,"fabric_movements","entry_unit")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN entry_unit TEXT NOT NULL DEFAULT 'متر'",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"fabric_movements","carton_count")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN carton_count REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"fabric_movements","meters_per_carton")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN meters_per_carton REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"fabric_movements","total_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN total_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"fabric_movements","unit_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
@@ -856,7 +856,7 @@ fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pi
  let conn=db(&app)?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('shop_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[shop_name.trim()]).map_err(|e|e.to_string())?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('owner_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[owner_name.trim()]).map_err(|e|e.to_string())?;
- if !pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('finance_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[pin]).map_err(|e|e.to_string())?}
+ if !pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('finance_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[pin]).map_err(|e|e.to_string())?;}
  get_app_settings(app)
 }
 
