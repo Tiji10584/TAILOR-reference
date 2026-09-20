@@ -18,14 +18,14 @@ button{font:inherit}
 .side-label{margin:0 0 13px;color:#d7ab46;font-size:.72rem;font-weight:700}
 .side-cards{display:grid;grid-auto-rows:1fr;flex:1;gap:12px}
 .nav-card{width:100%;min-height:0;position:relative;display:flex;align-items:center;gap:13px;padding:14px 15px;text-align:right;color:#e8f0eb;background:linear-gradient(145deg,#1a302a,#12231f);border:1px solid #35574d;border-radius:16px;box-shadow:0 10px 22px #0003;user-select:none;cursor:pointer;transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease}
-.nav-card:hover{transform:translateY(-3px);border-color:#6d8b80;background:linear-gradient(145deg,#234139,#172d27);box-shadow:0 16px 30px #0006}
+.nav-card:hover{transform:translateY(-3px);border-color:#edba4a;background:linear-gradient(145deg,#4b4328,#2b2c1c);box-shadow:0 16px 34px #b27d2138}
 .nav-card:active{transform:translateY(-1px) scale(.99)}
 .nav-card:focus-visible{outline:3px solid #edcf7a;outline-offset:3px}
 .nav-card.is-enabled{border-color:#35574d;background:linear-gradient(145deg,#1a302a,#12231f)}
 .nav-card.is-enabled:hover{border-color:#edba4a;background:linear-gradient(145deg,#4b4328,#2b2c1c);box-shadow:0 16px 34px #b27d2138}
 .nav-card.is-locked{cursor:default}
 .nav-icon{width:44px;height:44px;display:grid;place-items:center;flex:0 0 auto;border-radius:13px;color:#dcb04d;background:#294139}
-.nav-card:hover .nav-icon{transform:scale(1.07);background:#345149}.nav-icon{transition:transform .18s ease,background .18s ease}
+.nav-card:hover .nav-icon{transform:scale(1.07);background:#d5a33a;color:#152720}.nav-icon{transition:transform .18s ease,background .18s ease,color .18s ease}
 .nav-card.is-enabled .nav-icon{background:#294139;color:#dcb04d}
 .nav-card.is-enabled:hover .nav-icon{background:#d5a33a;color:#152720}
 .nav-icon svg{width:24px;height:24px}
