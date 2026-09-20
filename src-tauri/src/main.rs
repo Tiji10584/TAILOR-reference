@@ -5,7 +5,13 @@ use tauri::{AppHandle,Manager,WindowEvent};
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct Dashboard{received_today:i64,tailored_today:i64,due_today:i64}
+struct Dashboard{received_today:i64,tailored_today:i64,ready_to_deliver:i64}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkBoardItem{
+ order_id:i64,invoice_number:String,customer_name:String,customer_code:String,quantity:i64,status:String
+}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -154,6 +160,9 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"delivery_date")?{
   conn.execute("ALTER TABLE orders ADD COLUMN delivery_date TEXT",[]).map_err(|e|e.to_string())?;
  }
+ if !has_column(&conn,"work_status")?{
+  conn.execute("ALTER TABLE orders ADD COLUMN work_status TEXT NOT NULL DEFAULT 'انتظار القص'",[]).map_err(|e|e.to_string())?;
+ }
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
@@ -248,8 +257,44 @@ fn dashboard_summary(app:AppHandle)->Result<Dashboard,String>{
  let conn=db(&app)?;
  let received_today=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE received_date=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let tailored_today=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE tailored_date=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
- let due_today=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE delivery_date=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
- Ok(Dashboard{received_today,tailored_today,due_today})
+ let ready_to_deliver=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE work_status='في المحل بانتظار التسليم'",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ Ok(Dashboard{received_today,tailored_today,ready_to_deliver})
+}
+
+#[tauri::command]
+fn work_board(app:AppHandle)->Result<Vec<WorkBoardItem>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare(
+  "SELECT o.id,i.invoice_number,c.name,c.customer_code,o.quantity,o.work_status
+   FROM orders o
+   JOIN invoices i ON i.order_id=o.id
+   JOIN customers c ON c.id=i.customer_id
+   ORDER BY o.id DESC"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(WorkBoardItem{
+  order_id:row.get(0)?,invoice_number:row.get(1)?,customer_name:row.get(2)?,
+  customer_code:row.get(3)?,quantity:row.get(4)?,status:row.get(5)?,
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn advance_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
+ let conn=db(&app)?;
+ let current:String=conn.query_row("SELECT work_status FROM orders WHERE id=?1",[order_id],|row|row.get(0)).map_err(|_|"تعذر العثور على طلب الثوب".to_string())?;
+ let next=match current.as_str(){
+  "انتظار القص"=>"عند الخياط",
+  "عند الخياط"=>"في المغسلة",
+  "في المغسلة"=>"في المحل بانتظار التسليم",
+  "في المحل بانتظار التسليم"=>"تم التسليم",
+  "تم التسليم"=>return Ok(()),
+  _=>return Err("حالة الثوب غير معروفة".into()),
+ };
+ conn.execute(
+  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN ?1='في المغسلة' AND tailored_date IS NULL THEN date('now','localtime') ELSE tailored_date END WHERE id=?2",
+  params![next,order_id]
+ ).map_err(|e|e.to_string())?;
+ Ok(())
 }
 
 #[tauri::command]
@@ -432,7 +477,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
