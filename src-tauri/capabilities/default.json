@@ -1,1 +1,7 @@
-{"$schema":"../gen/schemas/desktop-schema.json","identifier":"default","description":"TAILOR desktop capability","windows":["main"],"permissions":["core:default"]}
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "TAILOR desktop capability",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default"]
+}
