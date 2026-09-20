@@ -47,7 +47,44 @@ struct FabricItem{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct FabricMovement{id:i64,movement_type:String,meters:f64,balance_after:f64,notes:String,created_at:String}
+struct FabricMovement{
+ id:i64,movement_type:String,meters:f64,balance_after:f64,entry_unit:String,carton_count:f64,
+ meters_per_carton:f64,total_cost:f64,unit_cost:f64,notes:String,created_at:String
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct ShopNote{id:i64,title:String,details:String,due_date:String,is_done:bool,created_at:String}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WhatsappCampaign{id:i64,title:String,message:String,recipient_count:i64,created_at:String}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct FinancialEntry{id:i64,entry_type:String,description:String,amount:f64,payment_method:String,created_at:String}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct DebtInvoice{invoice_id:i64,invoice_number:String,customer_name:String,phone:String,total:f64,paid:f64,discount:f64,remaining:f64}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct FinancialOverview{
+ today_sales:f64,today_received:f64,today_extra_income:f64,today_expenses:f64,total_outstanding:f64,
+ entries:Vec<FinancialEntry>,debts:Vec<DebtInvoice>
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct DailyReport{
+ report_date:String,new_customers:i64,invoices:i64,thobes:i64,invoice_sales:f64,invoice_received:f64,
+ extra_income:f64,expenses:f64,delivered:i64,fabric_used:f64,fabric_sold:f64
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -126,8 +163,8 @@ fn current_storage_info(app:&AppHandle)->Result<StorageInfo,String>{
  })
 }
 
-fn has_column(conn:&Connection,column:&str)->Result<bool,String>{
- let mut statement=conn.prepare("PRAGMA table_info(orders)").map_err(|e|e.to_string())?;
+fn has_column(conn:&Connection,table:&str,column:&str)->Result<bool,String>{
+ let mut statement=conn.prepare(&format!("PRAGMA table_info({})",table)).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|row.get::<_,String>(1)).map_err(|e|e.to_string())?;
  for row in rows{
   if row.map_err(|e|e.to_string())?==column{return Ok(true)}
@@ -241,22 +278,64 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    created_at TEXT NOT NULL,
    FOREIGN KEY(fabric_id) REFERENCES fabrics(id)
   );
+  CREATE TABLE IF NOT EXISTS shop_notes(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   title TEXT NOT NULL,
+   details TEXT NOT NULL DEFAULT '',
+   due_date TEXT NOT NULL DEFAULT '',
+   is_done INTEGER NOT NULL DEFAULT 0,
+   created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS whatsapp_campaigns(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   title TEXT NOT NULL,
+   message TEXT NOT NULL,
+   recipient_count INTEGER NOT NULL DEFAULT 0,
+   created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS financial_entries(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   entry_type TEXT NOT NULL,
+   invoice_id INTEGER,
+   description TEXT NOT NULL DEFAULT '',
+   amount REAL NOT NULL,
+   payment_method TEXT NOT NULL DEFAULT 'كاش',
+   created_at TEXT NOT NULL,
+   FOREIGN KEY(invoice_id) REFERENCES invoices(id)
+  );
+  CREATE TABLE IF NOT EXISTS app_settings(
+   setting_key TEXT PRIMARY KEY,
+   setting_value TEXT NOT NULL DEFAULT ''
+  );
  ").map_err(|e|e.to_string())?;
- if !has_column(&conn,"tailored_date")?{
+ if !has_column(&conn,"orders","tailored_date")?{
   conn.execute("ALTER TABLE orders ADD COLUMN tailored_date TEXT",[]).map_err(|e|e.to_string())?;
  }
- if !has_column(&conn,"delivery_date")?{
+ if !has_column(&conn,"orders","delivery_date")?{
   conn.execute("ALTER TABLE orders ADD COLUMN delivery_date TEXT",[]).map_err(|e|e.to_string())?;
  }
- if !has_column(&conn,"work_status")?{
+ if !has_column(&conn,"orders","work_status")?{
   conn.execute("ALTER TABLE orders ADD COLUMN work_status TEXT NOT NULL DEFAULT 'انتظار القص'",[]).map_err(|e|e.to_string())?;
  }
+ if !has_column(&conn,"orders","delivered_at")?{
+  conn.execute("ALTER TABLE orders ADD COLUMN delivered_at TEXT",[]).map_err(|e|e.to_string())?;
+ }
+ if !has_column(&conn,"fabric_movements","entry_unit")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN entry_unit TEXT NOT NULL DEFAULT 'متر'",[]).map_err(|e|e.to_string())?}
+ if !has_column(&conn,"fabric_movements","carton_count")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN carton_count REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
+ if !has_column(&conn,"fabric_movements","meters_per_carton")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN meters_per_carton REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
+ if !has_column(&conn,"fabric_movements","total_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN total_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
+ if !has_column(&conn,"fabric_movements","unit_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?}
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
  UPDATE invoices SET invoice_number='__invoice_' || id;
  UPDATE invoices SET invoice_number=CAST(id AS TEXT);
   UPDATE design_options SET category='الكبك' WHERE category='الكباك';
+  INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at)
+  SELECT 'دفعة فاتورة',i.id,'دفعة أولية للفاتورة ' || i.invoice_number,CAST(NULLIF(i.paid_amount,'') AS REAL),i.payment_method,i.created_at
+  FROM invoices i
+  WHERE CAST(NULLIF(i.paid_amount,'') AS REAL)>0
+    AND NOT EXISTS(SELECT 1 FROM financial_entries f WHERE f.invoice_id=i.id AND f.entry_type='دفعة فاتورة');
  ").map_err(|e|e.to_string())?;
  Ok(conn)
 }
@@ -380,7 +459,7 @@ fn advance_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
   _=>return Err("حالة الثوب غير معروفة".into()),
  };
  conn.execute(
-  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN ?1='في المغسلة' AND tailored_date IS NULL THEN date('now','localtime') ELSE tailored_date END WHERE id=?2",
+  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN ?1='في المغسلة' AND tailored_date IS NULL THEN date('now','localtime') ELSE tailored_date END,delivered_at=CASE WHEN ?1='تم التسليم' THEN datetime('now','localtime') ELSE delivered_at END WHERE id=?2",
   params![next,order_id]
  ).map_err(|e|e.to_string())?;
  Ok(())
@@ -399,7 +478,7 @@ fn retreat_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
   _=>return Err("حالة الثوب غير معروفة".into()),
  };
  conn.execute(
-  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN work_status='في المغسلة' AND ?1='عند الخياط' THEN NULL ELSE tailored_date END WHERE id=?2",
+  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN work_status='في المغسلة' AND ?1='عند الخياط' THEN NULL ELSE tailored_date END,delivered_at=CASE WHEN work_status='تم التسليم' THEN NULL ELSE delivered_at END WHERE id=?2",
   params![previous,order_id]
  ).map_err(|e|e.to_string())?;
  Ok(())
@@ -575,41 +654,55 @@ fn list_fabrics(app:AppHandle)->Result<Vec<FabricItem>,String>{
 }
 
 #[tauri::command]
-fn add_fabric(app:AppHandle,supplier_id:Option<i64>,name:String,color:String,stock_meters:f64,purchase_price:f64,sale_price:f64)->Result<i64,String>{
+fn add_fabric(app:AppHandle,supplier_id:Option<i64>,name:String,color:String,entry_unit:String,meter_quantity:f64,carton_count:f64,meters_per_carton:f64,purchase_amount:f64,sale_price:f64)->Result<i64,String>{
  let name=name.trim();let color=color.trim();
  if name.is_empty()||color.is_empty(){return Err("اسم القماش واللون مطلوبان".into())}
- if !stock_meters.is_finite()||stock_meters<0.0{return Err("كمية القماش غير صحيحة".into())}
+ let (stock_meters,purchase_price,total_cost,normalized_unit)=supply_calculation(&entry_unit,meter_quantity,carton_count,meters_per_carton,purchase_amount)?;
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
  transaction.execute(
   "INSERT INTO fabrics(supplier_id,name,color,stock_meters,purchase_price,sale_price,created_at)
    VALUES(?1,?2,?3,?4,?5,?6,datetime('now','localtime'))",
-  params![supplier_id,name,color,stock_meters,purchase_price.max(0.0),sale_price.max(0.0)]
+  params![supplier_id,name,color,stock_meters,purchase_price,sale_price.max(0.0)]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  if stock_meters>0.0{
   transaction.execute(
-   "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,notes,created_at)
-    VALUES(?1,'إضافة أولية',?2,?2,'تسجيل القماش',datetime('now','localtime'))",
-   params![id,stock_meters]
+   "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,entry_unit,carton_count,meters_per_carton,total_cost,unit_cost,notes,created_at)
+    VALUES(?1,'إضافة أولية',?2,?2,?3,?4,?5,?6,?7,'تسجيل القماش',datetime('now','localtime'))",
+   params![id,stock_meters,normalized_unit,carton_count.max(0.0),meters_per_carton.max(0.0),total_cost,purchase_price]
   ).map_err(|e|e.to_string())?;
  }
  transaction.commit().map_err(|e|e.to_string())?;
  Ok(id)
 }
 
+fn supply_calculation(entry_unit:&str,meter_quantity:f64,carton_count:f64,meters_per_carton:f64,purchase_amount:f64)->Result<(f64,f64,f64,String),String>{
+ if !purchase_amount.is_finite()||purchase_amount<0.0{return Err("سعر الشراء غير صحيح".into())}
+ if entry_unit.trim()=="كرتون"{
+  if !carton_count.is_finite()||carton_count<=0.0{return Err("أدخل عدد الكراتين".into())}
+  if !meters_per_carton.is_finite()||meters_per_carton<=0.0{return Err("أدخل عدد الأمتار داخل الكرتون".into())}
+  let meters=carton_count*meters_per_carton;
+  let total_cost=carton_count*purchase_amount;
+  let unit_cost=if meters>0.0{total_cost/meters}else{0.0};
+  return Ok((meters,unit_cost,total_cost,"كرتون".into()))
+ }
+ if !meter_quantity.is_finite()||meter_quantity<=0.0{return Err("أدخل كمية القماش بالمتر".into())}
+ Ok((meter_quantity,purchase_amount,meter_quantity*purchase_amount,"متر".into()))
+}
+
 #[tauri::command]
-fn restock_fabric(app:AppHandle,fabric_id:i64,meters:f64,purchase_price:f64,notes:String)->Result<(),String>{
- if !meters.is_finite()||meters<=0.0{return Err("أدخل كمية أكبر من صفر".into())}
+fn restock_fabric(app:AppHandle,fabric_id:i64,entry_unit:String,meter_quantity:f64,carton_count:f64,meters_per_carton:f64,purchase_amount:f64,notes:String)->Result<(),String>{
+ let (meters,purchase_price,total_cost,normalized_unit)=supply_calculation(&entry_unit,meter_quantity,carton_count,meters_per_carton,purchase_amount)?;
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
  let current:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|_|"القماش غير موجود".to_string())?;
  let balance=current+meters;
  transaction.execute("UPDATE fabrics SET stock_meters=?1,purchase_price=CASE WHEN ?2>0 THEN ?2 ELSE purchase_price END WHERE id=?3",params![balance,purchase_price,fabric_id]).map_err(|e|e.to_string())?;
  transaction.execute(
-  "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,notes,created_at)
-   VALUES(?1,'توريد',?2,?3,?4,datetime('now','localtime'))",
-  params![fabric_id,meters,balance,notes.trim()]
+  "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,entry_unit,carton_count,meters_per_carton,total_cost,unit_cost,notes,created_at)
+   VALUES(?1,'توريد',?2,?3,?4,?5,?6,?7,?8,?9,datetime('now','localtime'))",
+  params![fabric_id,meters,balance,normalized_unit,carton_count.max(0.0),meters_per_carton.max(0.0),total_cost,purchase_price,notes.trim()]
  ).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())
 }
@@ -618,13 +711,165 @@ fn restock_fabric(app:AppHandle,fabric_id:i64,meters:f64,purchase_price:f64,note
 fn fabric_movements(app:AppHandle,fabric_id:i64)->Result<Vec<FabricMovement>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
-  "SELECT id,movement_type,meters,balance_after,notes,created_at
+  "SELECT id,movement_type,meters,balance_after,entry_unit,carton_count,meters_per_carton,total_cost,unit_cost,notes,created_at
    FROM fabric_movements WHERE fabric_id=?1 ORDER BY id DESC LIMIT 100"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([fabric_id],|row|Ok(FabricMovement{
-  id:row.get(0)?,movement_type:row.get(1)?,meters:row.get(2)?,balance_after:row.get(3)?,notes:row.get(4)?,created_at:row.get(5)?,
+  id:row.get(0)?,movement_type:row.get(1)?,meters:row.get(2)?,balance_after:row.get(3)?,entry_unit:row.get(4)?,
+  carton_count:row.get(5)?,meters_per_carton:row.get(6)?,total_cost:row.get(7)?,unit_cost:row.get(8)?,notes:row.get(9)?,created_at:row.get(10)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn list_notes(app:AppHandle)->Result<Vec<ShopNote>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare("SELECT id,title,details,due_date,is_done,created_at FROM shop_notes ORDER BY is_done ASC,CASE WHEN due_date='' THEN 1 ELSE 0 END,due_date ASC,id DESC").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(ShopNote{id:row.get(0)?,title:row.get(1)?,details:row.get(2)?,due_date:row.get(3)?,is_done:row.get::<_,i64>(4)?!=0,created_at:row.get(5)?})).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn add_note(app:AppHandle,title:String,details:String,due_date:String)->Result<i64,String>{
+ if title.trim().is_empty(){return Err("عنوان الملاحظة مطلوب".into())}
+ let conn=db(&app)?;
+ conn.execute("INSERT INTO shop_notes(title,details,due_date,created_at) VALUES(?1,?2,?3,datetime('now','localtime'))",params![title.trim(),details.trim(),due_date.trim()]).map_err(|e|e.to_string())?;
+ Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+fn toggle_note(app:AppHandle,id:i64,is_done:bool)->Result<(),String>{
+ let conn=db(&app)?;
+ conn.execute("UPDATE shop_notes SET is_done=?1 WHERE id=?2",params![if is_done{1}else{0},id]).map_err(|e|e.to_string())?;
+ Ok(())
+}
+
+#[tauri::command]
+fn delete_note(app:AppHandle,id:i64)->Result<(),String>{
+ let conn=db(&app)?;
+ conn.execute("DELETE FROM shop_notes WHERE id=?1",[id]).map_err(|e|e.to_string())?;
+ Ok(())
+}
+
+#[tauri::command]
+fn list_whatsapp_campaigns(app:AppHandle)->Result<Vec<WhatsappCampaign>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare("SELECT id,title,message,recipient_count,created_at FROM whatsapp_campaigns ORDER BY id DESC LIMIT 50").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(WhatsappCampaign{id:row.get(0)?,title:row.get(1)?,message:row.get(2)?,recipient_count:row.get(3)?,created_at:row.get(4)?})).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn save_whatsapp_campaign(app:AppHandle,title:String,message:String,recipient_count:i64)->Result<i64,String>{
+ if title.trim().is_empty()||message.trim().is_empty(){return Err("عنوان الإعلان ونص الرسالة مطلوبان".into())}
+ if recipient_count<1{return Err("اختر عميلًا واحدًا على الأقل".into())}
+ let conn=db(&app)?;
+ conn.execute("INSERT INTO whatsapp_campaigns(title,message,recipient_count,created_at) VALUES(?1,?2,?3,datetime('now','localtime'))",params![title.trim(),message.trim(),recipient_count]).map_err(|e|e.to_string())?;
+ Ok(conn.last_insert_rowid())
+}
+
+fn parse_money(value:&str)->f64{value.trim().parse::<f64>().unwrap_or(0.0)}
+
+#[tauri::command]
+fn financial_overview(app:AppHandle)->Result<FinancialOverview,String>{
+ let conn=db(&app)?;
+ let today_sales=conn.query_row("SELECT COALESCE(SUM(CAST(NULLIF(total_price,'') AS REAL)),0) FROM invoices WHERE date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let today_received:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دفعة فاتورة' AND date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let registered_extra:f64=conn.query_row("SELECT COALESCE(SUM(total_price),0) FROM extra_transactions WHERE date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let today_extra_income=registered_extra+manual_income;
+ let today_expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='مصروف' AND date(created_at)=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let total_outstanding=conn.query_row("SELECT COALESCE(SUM(MAX(0,CAST(NULLIF(total_price,'') AS REAL)-CAST(NULLIF(paid_amount,'') AS REAL)-CAST(NULLIF(discount,'') AS REAL))),0) FROM invoices",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let entries={
+  let mut statement=conn.prepare("SELECT id,entry_type,description,amount,payment_method,created_at FROM financial_entries ORDER BY id DESC LIMIT 100").map_err(|e|e.to_string())?;
+  let rows=statement.query_map([],|row|Ok(FinancialEntry{id:row.get(0)?,entry_type:row.get(1)?,description:row.get(2)?,amount:row.get(3)?,payment_method:row.get(4)?,created_at:row.get(5)?})).map_err(|e|e.to_string())?;
+  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?
+ };
+ let debts={
+  let mut statement=conn.prepare("SELECT i.id,i.invoice_number,c.name,c.phone,i.total_price,i.paid_amount,i.discount FROM invoices i JOIN customers c ON c.id=i.customer_id ORDER BY i.id DESC").map_err(|e|e.to_string())?;
+  let rows=statement.query_map([],|row|{
+   let total_text:String=row.get(4)?;let paid_text:String=row.get(5)?;let discount_text:String=row.get(6)?;
+   let total=parse_money(&total_text);let paid=parse_money(&paid_text);let discount=parse_money(&discount_text);
+   Ok(DebtInvoice{invoice_id:row.get(0)?,invoice_number:row.get(1)?,customer_name:row.get(2)?,phone:row.get(3)?,total,paid,discount,remaining:(total-paid-discount).max(0.0)})
+  }).map_err(|e|e.to_string())?;
+  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?.into_iter().filter(|item|item.remaining>0.0001).collect()
+ };
+ Ok(FinancialOverview{today_sales,today_received,today_extra_income,today_expenses,total_outstanding,entries,debts})
+}
+
+#[tauri::command]
+fn add_financial_entry(app:AppHandle,entry_type:String,description:String,amount:f64,payment_method:String)->Result<i64,String>{
+ if entry_type!="مصروف"&&entry_type!="دخل يدوي"{return Err("نوع الحركة المالية غير صحيح".into())}
+ if !amount.is_finite()||amount<=0.0{return Err("أدخل مبلغًا أكبر من صفر".into())}
+ if description.trim().is_empty(){return Err("اكتب وصف الحركة المالية".into())}
+ let conn=db(&app)?;
+ conn.execute("INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at) VALUES(?1,?2,?3,?4,datetime('now','localtime'))",params![entry_type,description.trim(),amount,payment_method]).map_err(|e|e.to_string())?;
+ Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method:String)->Result<(),String>{
+ if !amount.is_finite()||amount<=0.0{return Err("أدخل مبلغ الدفعة".into())}
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let (invoice_number,customer_name,total_text,paid_text,discount_text):(String,String,String,String,String)=transaction.query_row(
+  "SELECT i.invoice_number,c.name,i.total_price,i.paid_amount,i.discount FROM invoices i JOIN customers c ON c.id=i.customer_id WHERE i.id=?1",[invoice_id],
+  |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?))
+ ).map_err(|_|"الفاتورة غير موجودة".to_string())?;
+ let total=parse_money(&total_text);let paid=parse_money(&paid_text);let discount=parse_money(&discount_text);let remaining=(total-paid-discount).max(0.0);
+ if amount>remaining+0.0001{return Err(format!("المتبقي على الفاتورة {:.2} ريال فقط",remaining))}
+ let new_paid=paid+amount;
+ transaction.execute("UPDATE invoices SET paid_amount=?1,updated_at=datetime('now','localtime') WHERE id=?2",params![format!("{:.2}",new_paid),invoice_id]).map_err(|e|e.to_string())?;
+ transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![invoice_id,format!("فاتورة {} — {}",invoice_number,customer_name),amount,payment_method]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn daily_report(app:AppHandle,report_date:String)->Result<DailyReport,String>{
+ let conn=db(&app)?;let day=report_date.trim();
+ if day.is_empty(){return Err("اختر تاريخ التقرير".into())}
+ let new_customers=conn.query_row("SELECT COUNT(*) FROM customers WHERE date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let (invoices,thobes,invoice_sales):(i64,i64,f64)=conn.query_row("SELECT COUNT(*),COALESCE(SUM(total_thobes),0),COALESCE(SUM(CAST(NULLIF(total_price,'') AS REAL)),0) FROM invoices WHERE date(created_at)=date(?1)",[day],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(|e|e.to_string())?;
+ let invoice_received:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دفعة فاتورة' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let registered_extra:f64=conn.query_row("SELECT COALESCE(SUM(total_price),0) FROM extra_transactions WHERE date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let extra_income=registered_extra+manual_income;
+ let expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='مصروف' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let delivered=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE work_status='تم التسليم' AND date(delivered_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let fabric_used=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='تفصيل ثوب' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let fabric_sold=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='بيع قماش' AND date(created_at)=date(?1)",[day],|row|row.get(0)).map_err(|e|e.to_string())?;
+ Ok(DailyReport{report_date:day.into(),new_customers,invoices,thobes,invoice_sales,invoice_received,extra_income,expenses,delivered,fabric_used,fabric_sold})
+}
+
+#[tauri::command]
+fn get_app_settings(app:AppHandle)->Result<AppSettings,String>{
+ let conn=db(&app)?;
+ let value=|key:&str|->String{conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key=?1",[key],|row|row.get(0)).unwrap_or_default()};
+ let finance_pin=value("finance_pin");
+ Ok(AppSettings{shop_name:value("shop_name"),owner_name:value("owner_name"),finance_pin_set:!finance_pin.is_empty()})
+}
+
+#[tauri::command]
+fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pin:String)->Result<AppSettings,String>{
+ let pin=finance_pin.trim();
+ if !pin.is_empty()&&(pin.len()<4||pin.len()>8||!pin.chars().all(|character|character.is_ascii_digit())){return Err("رمز المالية يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
+ let conn=db(&app)?;
+ conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('shop_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[shop_name.trim()]).map_err(|e|e.to_string())?;
+ conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('owner_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[owner_name.trim()]).map_err(|e|e.to_string())?;
+ if !pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('finance_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[pin]).map_err(|e|e.to_string())?}
+ get_app_settings(app)
+}
+
+#[tauri::command]
+fn clear_finance_pin(app:AppHandle)->Result<AppSettings,String>{
+ let conn=db(&app)?;conn.execute("DELETE FROM app_settings WHERE setting_key='finance_pin'",[]).map_err(|e|e.to_string())?;get_app_settings(app)
+}
+
+#[tauri::command]
+fn verify_finance_pin(app:AppHandle,pin:String)->Result<bool,String>{
+ let conn=db(&app)?;
+ let saved:String=conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key='finance_pin'",[],|row|row.get(0)).unwrap_or_default();
+ Ok(saved.is_empty()||saved==pin.trim())
 }
 
 #[tauri::command]
@@ -743,6 +988,8 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  let mut conn=db(&app)?;
  if let Some(id)=payload.id{
   let transaction=conn.transaction().map_err(|e|e.to_string())?;
+  let old_paid_text:String=transaction.query_row("SELECT paid_amount FROM invoices WHERE id=?1 AND customer_id=?2",params![id,payload.customer_id],|row|row.get(0)).map_err(|_|"الفاتورة غير موجودة".to_string())?;
+  let payment_delta=parse_money(&payload.paid_amount)-parse_money(&old_paid_text);
   transaction.execute(
    "UPDATE invoices SET weight=?1,delivery_date=?2,day_count=?3,total_thobes=?4,total_price=?5,paid_amount=?6,payment_method=?7,discount=?8,notes=?9,measurements_json=?10,fabric_json=?11,designs_json=?12,details_json=?13,updated_at=datetime('now','localtime') WHERE id=?14 AND customer_id=?15",
    params![&payload.weight,&payload.delivery_date,payload.day_count,payload.total_thobes,&payload.total_price,&payload.paid_amount,&payload.payment_method,&payload.discount,&payload.notes,&payload.measurements_json,&payload.fabric_json,&payload.designs_json,&payload.details_json,id,payload.customer_id]
@@ -752,6 +999,9 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
    params![id,payload.customer_id],
    |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
   ).map_err(|e|e.to_string())?;
+  if payment_delta.abs()>0.0001{
+   transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("تعديل دفعة الفاتورة {}",invoice_number),payment_delta,&payload.payment_method]).map_err(|e|e.to_string())?;
+  }
   transaction.execute("UPDATE orders SET quantity=?1,delivery_date=NULLIF(?2,'') WHERE id=?3",params![payload.total_thobes,&payload.delivery_date,order_id]).map_err(|e|e.to_string())?;
   apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
   transaction.commit().map_err(|e|e.to_string())?;
@@ -770,6 +1020,10 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  let id=transaction.last_insert_rowid();
  let invoice_number=id.to_string();
  transaction.execute("UPDATE invoices SET invoice_number=?1 WHERE id=?2",params![&invoice_number,id]).map_err(|e|e.to_string())?;
+ let initial_payment=parse_money(&payload.paid_amount);
+ if initial_payment>0.0{
+  transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("دفعة أولية للفاتورة {}",invoice_number),initial_payment,&payload.payment_method]).map_err(|e|e.to_string())?;
+ }
  apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
  let created_at:String=transaction.query_row("SELECT created_at FROM invoices WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
@@ -796,7 +1050,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,verify_finance_pin,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
