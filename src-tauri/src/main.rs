@@ -1,6 +1,6 @@
 use rusqlite::{params,Connection};
 use serde::{Deserialize,Serialize};
-use std::{fs,path::PathBuf,sync::Mutex};
+use std::{fs,path::{Path,PathBuf},sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
 
 #[derive(Serialize)]
@@ -34,7 +34,41 @@ struct InvoicePayload{
 #[serde(rename_all="camelCase")]
 struct InvoiceRecord{id:i64,invoice_number:String,created_at:String}
 
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct StorageInfo{folder:String,database_path:String,is_custom:bool}
+
 struct SessionState(Mutex<Option<i64>>);
+
+fn default_data_dir(app:&AppHandle)->Result<PathBuf,String>{
+ app.path().app_data_dir().map_err(|e|e.to_string())
+}
+
+fn storage_config_path(app:&AppHandle)->Result<PathBuf,String>{
+ Ok(default_data_dir(app)?.join("storage-location.txt"))
+}
+
+fn data_dir(app:&AppHandle)->Result<(PathBuf,bool),String>{
+ let default=default_data_dir(app)?;
+ if let Ok(raw)=fs::read_to_string(storage_config_path(app)?){
+  let folder=raw.trim();
+  if !folder.is_empty(){return Ok((PathBuf::from(folder),true))}
+ }
+ Ok((default,false))
+}
+
+fn database_path(app:&AppHandle)->Result<PathBuf,String>{
+ Ok(data_dir(app)?.0.join("tailor.sqlite"))
+}
+
+fn current_storage_info(app:&AppHandle)->Result<StorageInfo,String>{
+ let (folder,is_custom)=data_dir(app)?;
+ Ok(StorageInfo{
+  database_path:folder.join("tailor.sqlite").display().to_string(),
+  folder:folder.display().to_string(),
+  is_custom,
+ })
+}
 
 fn has_column(conn:&Connection,column:&str)->Result<bool,String>{
  let mut statement=conn.prepare("PRAGMA table_info(orders)").map_err(|e|e.to_string())?;
@@ -46,7 +80,7 @@ fn has_column(conn:&Connection,column:&str)->Result<bool,String>{
 }
 
 fn db(app:&AppHandle)->Result<Connection,String>{
- let dir:PathBuf=app.path().app_data_dir().map_err(|e|e.to_string())?;
+ let dir=data_dir(app)?.0;
  fs::create_dir_all(&dir).map_err(|e|e.to_string())?;
  let conn=Connection::open(dir.join("tailor.sqlite")).map_err(|e|e.to_string())?;
  conn.execute_batch("
@@ -134,6 +168,64 @@ fn finish_session(app:&AppHandle,id:i64)->Result<(),String>{
   [id]
  ).map_err(|e|e.to_string())?;
  Ok(())
+}
+
+fn finish_session_at(path:&Path,id:i64)->Result<(),String>{
+ let conn=Connection::open(path).map_err(|e|e.to_string())?;
+ conn.execute(
+  "UPDATE app_sessions SET ended_at=datetime('now','localtime') WHERE id=?1 AND ended_at IS NULL",
+  [id]
+ ).map_err(|e|e.to_string())?;
+ Ok(())
+}
+
+fn validate_tailor_database(path:&Path)->Result<(),String>{
+ let conn=Connection::open(path).map_err(|_|"تعذر فتح ملف البيانات المحدد".to_string())?;
+ let tables:i64=conn.query_row(
+  "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('customers','invoices')",
+  [],
+  |row|row.get(0)
+ ).map_err(|_|"ملف البيانات المحدد غير صالح".to_string())?;
+ if tables<2{return Err("المجلد لا يحتوي على قاعدة بيانات TAILOR صالحة".into())}
+ Ok(())
+}
+
+#[tauri::command]
+fn storage_info(app:AppHandle)->Result<StorageInfo,String>{
+ current_storage_info(&app)
+}
+
+#[tauri::command]
+fn set_storage_location(app:AppHandle,state:tauri::State<SessionState>,folder:String,mode:String)->Result<StorageInfo,String>{
+ let folder=folder.trim();
+ if folder.is_empty(){return Err("اختر مجلدًا صالحًا".into())}
+ let target_dir=PathBuf::from(folder);
+ fs::create_dir_all(&target_dir).map_err(|_|"تعذر إنشاء المجلد أو الكتابة داخله".to_string())?;
+ let source_database=database_path(&app)?;
+ let target_database=target_dir.join("tailor.sqlite");
+ if source_database!=target_database{
+  match mode.as_str(){
+   "copy"=>{
+    drop(db(&app)?);
+    if target_database.exists(){return Err("يوجد ملف بيانات في هذا المجلد. استخدم خيار ربط نسخة موجودة أو اختر مجلدًا فارغًا".into())}
+    fs::copy(&source_database,&target_database).map_err(|_|"تعذر نسخ قاعدة البيانات إلى المجلد الجديد".to_string())?;
+   },
+   "use"=>{
+    if !target_database.exists(){return Err("لم يتم العثور على ملف tailor.sqlite داخل المجلد المحدد".into())}
+    validate_tailor_database(&target_database)?;
+   },
+   _=>return Err("طريقة تغيير مكان البيانات غير صحيحة".into()),
+  }
+ }
+ let default=default_data_dir(&app)?;
+ fs::create_dir_all(&default).map_err(|e|e.to_string())?;
+ fs::write(storage_config_path(&app)?,target_dir.display().to_string()).map_err(|_|"تعذر حفظ مكان البيانات الجديد".to_string())?;
+ let previous_session=state.0.lock().map_err(|_|"تعذر تحديث جلسة التطبيق".to_string())?.take();
+ if let Some(id)=previous_session{let _=finish_session_at(&source_database,id);}
+ drop(db(&app)?);
+ let next_session=begin_session(&app)?;
+ *state.0.lock().map_err(|_|"تعذر بدء جلسة البيانات الجديدة".to_string())?=Some(next_session);
+ current_storage_info(&app)
 }
 
 #[tauri::command]
@@ -254,6 +346,7 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
 
 fn main(){
  tauri::Builder::default()
+  .plugin(tauri_plugin_dialog::init())
   .setup(|app|{
    let session_id=begin_session(&app.handle()).map_err(std::io::Error::other)?;
    app.manage(SessionState(Mutex::new(Some(session_id))));
@@ -271,7 +364,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history,create_customer,list_design_options,add_design_option,delete_design_option,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,current_session,session_history,storage_info,set_storage_location,create_customer,list_design_options,add_design_option,delete_design_option,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
