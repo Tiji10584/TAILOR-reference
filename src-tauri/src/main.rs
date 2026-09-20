@@ -300,7 +300,7 @@ fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,Stri
 fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,String>{
  let conn=db(&app)?;
  let query=query.trim().to_string();
- let pattern=format!("%{}%",query);
+ let pattern=format!("{}%",query);
  let mut statement=conn.prepare(
   "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),'')
    FROM customers c
