@@ -300,17 +300,30 @@ fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,Stri
 fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,String>{
  let conn=db(&app)?;
  let query=query.trim().to_string();
- let pattern=format!("{}%",query);
+ let escaped=query.replace('\\',"\\\\").replace('%',"\\%").replace('_',"\\_");
+ let contains_pattern=format!("%{}%",escaped);
+ let prefix_pattern=format!("{}%",escaped);
+ let word_prefix_pattern=format!("% {}%",escaped);
  let mut statement=conn.prepare(
   "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),'')
    FROM customers c
    LEFT JOIN invoices i ON i.customer_id=c.id
-   WHERE ?1='' OR c.name LIKE ?2 COLLATE NOCASE OR c.customer_code LIKE ?2 OR c.phone LIKE ?2
+   WHERE ?1=''
+      OR c.name LIKE ?2 ESCAPE '\\' COLLATE NOCASE
+      OR c.customer_code LIKE ?2 ESCAPE '\\'
+      OR c.phone LIKE ?2 ESCAPE '\\'
    GROUP BY c.id,c.customer_code,c.name,c.phone
-   ORDER BY CAST(c.customer_code AS INTEGER) DESC,c.id DESC
+   ORDER BY CASE
+     WHEN ?1='' THEN 4
+     WHEN c.name=?1 COLLATE NOCASE THEN 0
+     WHEN c.name LIKE ?3 ESCAPE '\\' COLLATE NOCASE THEN 1
+     WHEN c.name LIKE ?4 ESCAPE '\\' COLLATE NOCASE THEN 2
+     ELSE 3
+   END,
+   length(c.name) ASC,CAST(c.customer_code AS INTEGER) DESC,c.id DESC
    LIMIT 200"
  ).map_err(|e|e.to_string())?;
- let rows=statement.query_map(params![&query,&pattern],|row|Ok(CustomerSearchItem{
+ let rows=statement.query_map(params![&query,&contains_pattern,&prefix_pattern,&word_prefix_pattern],|row|Ok(CustomerSearchItem{
   id:row.get(0)?,code:row.get(1)?,name:row.get(2)?,phone:row.get(3)?,
   invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,
  })).map_err(|e|e.to_string())?;
