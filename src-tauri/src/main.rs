@@ -36,7 +36,7 @@ struct DesignOption{id:i64,category:String,name:String,image_data:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct Supplier{id:i64,name:String,phone:String,notes:String,fabric_count:i64,total_paid:f64,created_at:String}
+struct Supplier{id:i64,name:String,phone:String,notes:String,fabric_count:i64,total_purchases:f64,total_paid:f64,balance:f64,created_at:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -651,14 +651,15 @@ fn list_suppliers(app:AppHandle)->Result<Vec<Supplier>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
   "SELECT s.id,s.name,s.phone,s.notes,COUNT(f.id),
+          COALESCE((SELECT SUM(m.total_cost) FROM fabric_movements m JOIN fabrics sf ON sf.id=m.fabric_id WHERE sf.supplier_id=s.id AND m.meters>0),0),
           COALESCE((SELECT SUM(p.amount) FROM supplier_payments p WHERE p.supplier_id=s.id),0),s.created_at
    FROM suppliers s LEFT JOIN fabrics f ON f.supplier_id=s.id
    GROUP BY s.id,s.name,s.phone,s.notes,s.created_at ORDER BY s.id DESC"
  ).map_err(|e|e.to_string())?;
- let rows=statement.query_map([],|row|Ok(Supplier{
+ let rows=statement.query_map([],|row|{let total_purchases:f64=row.get(5)?;let total_paid:f64=row.get(6)?;Ok(Supplier{
   id:row.get(0)?,name:row.get(1)?,phone:row.get(2)?,notes:row.get(3)?,
-  fabric_count:row.get(4)?,total_paid:row.get(5)?,created_at:row.get(6)?,
- })).map_err(|e|e.to_string())?;
+  fabric_count:row.get(4)?,total_purchases,total_paid,balance:(total_purchases-total_paid).max(0.0),created_at:row.get(7)?,
+ })}).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
