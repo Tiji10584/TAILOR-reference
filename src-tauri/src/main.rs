@@ -89,7 +89,7 @@ struct DailyReport{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool,theme:String}
+struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -933,18 +933,21 @@ fn get_app_settings(app:AppHandle)->Result<AppSettings,String>{
  let conn=db(&app)?;
  let value=|key:&str|->String{conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key=?1",[key],|row|row.get(0)).unwrap_or_default()};
  let finance_pin=value("finance_pin");
+ let app_pin=value("app_pin");
  let saved_theme=value("theme");
- Ok(AppSettings{shop_name:value("shop_name"),owner_name:value("owner_name"),finance_pin_set:!finance_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()}})
+ Ok(AppSettings{shop_name:value("shop_name"),owner_name:value("owner_name"),finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()}})
 }
 
 #[tauri::command]
-fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pin:String)->Result<AppSettings,String>{
- let pin=finance_pin.trim();
+fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pin:String,app_pin:String)->Result<AppSettings,String>{
+ let pin=finance_pin.trim();let entry_pin=app_pin.trim();
  if !pin.is_empty()&&(pin.len()<4||pin.len()>8||!pin.chars().all(|character|character.is_ascii_digit())){return Err("رمز المالية يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
+ if !entry_pin.is_empty()&&(entry_pin.len()<4||entry_pin.len()>8||!entry_pin.chars().all(|character|character.is_ascii_digit())){return Err("رمز دخول التطبيق يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
  let conn=db(&app)?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('shop_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[shop_name.trim()]).map_err(|e|e.to_string())?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('owner_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[owner_name.trim()]).map_err(|e|e.to_string())?;
  if !pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('finance_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[pin]).map_err(|e|e.to_string())?;}
+ if !entry_pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('app_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[entry_pin]).map_err(|e|e.to_string())?;}
  get_app_settings(app)
 }
 
@@ -954,9 +957,21 @@ fn clear_finance_pin(app:AppHandle)->Result<AppSettings,String>{
 }
 
 #[tauri::command]
+fn clear_app_pin(app:AppHandle)->Result<AppSettings,String>{
+ let conn=db(&app)?;conn.execute("DELETE FROM app_settings WHERE setting_key='app_pin'",[]).map_err(|e|e.to_string())?;get_app_settings(app)
+}
+
+#[tauri::command]
 fn verify_finance_pin(app:AppHandle,pin:String)->Result<bool,String>{
  let conn=db(&app)?;
  let saved:String=conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key='finance_pin'",[],|row|row.get(0)).unwrap_or_default();
+ Ok(saved.is_empty()||saved==pin.trim())
+}
+
+#[tauri::command]
+fn verify_app_pin(app:AppHandle,pin:String)->Result<bool,String>{
+ let conn=db(&app)?;
+ let saved:String=conn.query_row("SELECT setting_value FROM app_settings WHERE setting_key='app_pin'",[],|row|row.get(0)).unwrap_or_default();
  Ok(saved.is_empty()||saved==pin.trim())
 }
 
@@ -1146,7 +1161,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,verify_finance_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
