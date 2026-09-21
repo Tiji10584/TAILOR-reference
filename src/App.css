@@ -247,3 +247,33 @@ button{font:inherit}
 .theme-light .invoice-history-actions .duplicate-invoice{color:#5e410d;border-color:#b98728;background:#f2d98e}
 .theme-light .customer-history-placeholder,.theme-light .customer-empty{color:#67583d}
 .supplier-account-list article{grid-template-columns:minmax(190px,1fr) minmax(360px,2fr) auto}.supplier-identity em{color:#8fa49b;font-size:.65rem;font-style:normal}.supplier-account-values{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.supplier-account-values>span,.supplier-account-values>strong{display:grid;gap:3px;padding:9px 11px;border:1px solid #34564b;border-radius:9px;color:#aebfb7;background:#0a1a15;font-size:.65rem}.supplier-account-values b{color:#eef3f0;font-size:.82rem}.supplier-account-values .has-balance{color:#ffc2b1;border-color:#75483c;background:#2e1b17}.supplier-account-values .has-balance b{color:#ffc2b1}.supplier-account-values .settled{color:#a8d9b8;border-color:#3f6e50;background:#14281b}.supplier-fabric-count{white-space:nowrap}.theme-light .supplier-identity em{color:#75694f}.theme-light .supplier-account-values>span,.theme-light .supplier-account-values>strong{color:#66583c;border-color:#d3bd83;background:#fffaf0}.theme-light .supplier-account-values b{color:#35250f}.theme-light .supplier-account-values .has-balance,.theme-light .supplier-account-values .has-balance b{color:#8e2f1c}.theme-light .supplier-account-values .has-balance{border-color:#d89c8b;background:#fff0e9}.theme-light .supplier-account-values .settled,.theme-light .supplier-account-values .settled b{color:#315f3d}.theme-light .supplier-account-values .settled{border-color:#91bd9d;background:#eff9f1}@media(max-width:900px){.supplier-account-list article{grid-template-columns:1fr}.supplier-account-values{grid-template-columns:1fr!important}}
+
+/* فصل الثيم الفاتح عن الأخضر القديم */
+.collar-switch{grid-template-columns:repeat(3,1fr)}
+.no-collar-note{margin:18px 0;padding:18px;border:1px dashed #6d8a7f;border-radius:12px;text-align:center;color:#bdcbc5;background:#0b1b16}
+.theme-light .no-collar-note{color:#4c402b;border-color:#c9a24e;background:#fff8e8}
+.theme-light .pin-gate{color:#2f271b;border-color:#b58a31;background:#fff;box-shadow:0 18px 45px #513b181f}
+.theme-light .pin-gate>span,.theme-light .finance-period-title,.theme-light .report-result-title{color:#94650c}
+.theme-light .pin-gate p{color:#6d6251}
+.theme-light .pin-gate input{color:#2f271b!important;border-color:#c7a14c!important;background:#fff!important}
+.theme-light .pin-gate button{color:#2f271b;border-color:#b99548;background:#f4e4b8}
+.theme-light .pin-gate button[type="submit"]{color:#241a09;border-color:#c7952c;background:#e2b343}
+.theme-light .finance-metrics article,.theme-light .report-cards article,.theme-light .report-money article{color:#2f271b;border-color:#cbb06f;background:#fff;box-shadow:0 8px 18px #5f481517}
+.theme-light .finance-metrics span,.theme-light .report-cards span,.theme-light .report-money span{color:#6b604e}
+.theme-light .finance-metrics b,.theme-light .report-cards b,.theme-light .report-money b{color:#2f271b}
+.theme-light .finance-metrics .expense{border-color:#d19a8b;background:#fff3ee}
+.theme-light .finance-metrics .debt,.theme-light .month-metrics .net,.theme-light .report-money .net{border-color:#c89a36;background:#fff0c8}
+.theme-light .report-filter{color:#2f271b;border-color:#c7a24e;background:#fff;box-shadow:0 8px 18px #5f481517}
+.theme-light .report-filter input,.theme-light .report-filter select{color:#2f271b!important;border-color:#c9aa62!important;background:#fff!important}
+.theme-light .report-filter button{color:#241a09;background:#e0ad37}
+.theme-light .storage-card{color:#2f271b;border-color:#c8a24f;background:#fff;box-shadow:0 12px 28px #5f48151a}
+.theme-light .storage-copy>span{color:#95640a}.theme-light .storage-copy p{color:#6b604e}.theme-light .storage-copy p b{color:#6f4c0c}
+.theme-light .storage-path{border-color:#ccb06f;background:#faf6ec}.theme-light .storage-path small{color:#756a58}.theme-light .storage-path b,.theme-light .storage-path span{color:#2f271b}.theme-light .storage-path em{color:#2f271b;background:#efd590}
+.theme-light .storage-actions button{color:#2f271b;border-color:#c39c48;background:#f7e8bf}.theme-light .storage-actions .storage-copy-button{color:#241a09;background:#e0ad37}
+.theme-light .module-list,.theme-light .business-list,.theme-light .business-form{color:#2f271b;border-color:#cbb06f;background:#fff}
+.theme-light .module-search span{color:#8f610d}.theme-light .module-search input{color:#2f271b!important;border-color:#c8a24e!important;background:#fff!important}
+.theme-light .finance-entry-list article,.theme-light .module-list article{color:#2f271b;border-color:#dfcfaa;background:#fffaf0}
+.theme-light .finance-entry-list small,.theme-light .module-list article small,.theme-light .module-list article em{color:#756a58}
+.theme-light .finance-entry-list article>button,.theme-light .module-list article>button,.theme-light .selection-summary button,.theme-light .debt-payment button{color:#2f271b;border-color:#bf9744;background:#f1d995}
+.theme-light .debt-payment input,.theme-light .debt-payment select{color:#2f271b!important;border-color:#c8a75c!important;background:#fff!important}
+.theme-light .danger-button{color:#7d2c1f!important;border-color:#d09a8d!important;background:#fff0ec!important}
