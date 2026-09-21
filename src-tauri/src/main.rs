@@ -1,4 +1,4 @@
-use rusqlite::{params,Connection};
+use rusqlite::{params,Connection,OptionalExtension};
 use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
@@ -711,6 +711,29 @@ fn add_fabric(app:AppHandle,supplier_id:Option<i64>,name:String,color:String,ent
  let (stock_meters,purchase_price,total_cost,normalized_unit)=supply_calculation(&entry_unit,meter_quantity,carton_count,meters_per_carton,purchase_amount)?;
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let existing=transaction.query_row(
+  "SELECT id,stock_meters,purchase_price FROM fabrics
+   WHERE lower(trim(name))=lower(?1) AND lower(trim(color))=lower(?2)
+     AND ((supplier_id IS NULL AND ?3 IS NULL) OR supplier_id=?3)
+   ORDER BY id LIMIT 1",
+  params![name,color,supplier_id],
+  |row|Ok((row.get::<_,i64>(0)?,row.get::<_,f64>(1)?,row.get::<_,f64>(2)?))
+ ).optional().map_err(|e|e.to_string())?;
+ if let Some((id,current_stock,current_cost))=existing{
+  let balance=current_stock+stock_meters;
+  let average_cost=if total_cost>0.0&&balance>0.0{((current_stock*current_cost)+total_cost)/balance}else{current_cost};
+  transaction.execute(
+   "UPDATE fabrics SET stock_meters=?1,purchase_price=?2,sale_price=CASE WHEN ?3>0 THEN ?3 ELSE sale_price END WHERE id=?4",
+   params![balance,average_cost,sale_price.max(0.0),id]
+  ).map_err(|e|e.to_string())?;
+  transaction.execute(
+   "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,entry_unit,carton_count,meters_per_carton,total_cost,unit_cost,notes,created_at)
+    VALUES(?1,'توريد ودمج',?2,?3,?4,?5,?6,?7,?8,'دُمج مع القماش الموجود',datetime('now','localtime'))",
+   params![id,stock_meters,balance,normalized_unit,carton_count.max(0.0),meters_per_carton.max(0.0),total_cost,purchase_price]
+  ).map_err(|e|e.to_string())?;
+  transaction.commit().map_err(|e|e.to_string())?;
+  return Ok(id)
+ }
  transaction.execute(
   "INSERT INTO fabrics(supplier_id,name,color,stock_meters,purchase_price,sale_price,created_at)
    VALUES(?1,?2,?3,?4,?5,?6,datetime('now','localtime'))",
