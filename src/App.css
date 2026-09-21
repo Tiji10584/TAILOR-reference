@@ -187,3 +187,39 @@ button{font:inherit}
 .theme-light{min-height:100vh;color:#352b18;background:linear-gradient(135deg,#fffdf7,#f3ead1)}.theme-light .topbar,.theme-light .side-menu,.theme-light .dashboard,.theme-light .business-page,.theme-light .customer-search-page,.theme-light .settings-page,.theme-light .order-page{color:#352b18}.theme-light .topbar{border-color:#c7a654}.theme-light .brand small,.theme-light .greeting p,.theme-light .business-head p,.theme-light .customer-search-head p{color:#695f49}.theme-light .nav-card,.theme-light .metric-card,.theme-light .session-card,.theme-light .work-board-column,.theme-light .business-form,.theme-light .business-list,.theme-light .module-list,.theme-light .customer-results-panel,.theme-light .customer-history-panel,.theme-light .measure-column,.theme-light .order-summary-strip>div,.theme-light .order-summary-strip>label,.theme-light .compact-finance>label,.theme-light .compact-remaining{color:#342a17;border-color:#cbb477;background:#fffdf8;box-shadow:0 9px 24px #755b2020}.theme-light .nav-card:hover{color:#2c210e;border-color:#b78520;background:#f3dfa5}.theme-light .nav-icon,.theme-light .nav-card.is-enabled .nav-icon{color:#69480e;background:#f0d994}.theme-light input,.theme-light select,.theme-light textarea,.theme-light .fabric-search-picker input{color:#322817!important;border-color:#c6ae72!important;background:#fff!important}.theme-light .compact-select>span,.theme-light .compact-field>span,.theme-light .compact-notes>span,.theme-light .fabric-search-picker>label>span{color:#3c311d}.theme-light .work-board-item,.theme-light .module-list article,.theme-light .extra-history,.theme-light .finance-entry-list article,.theme-light .campaign-history article,.theme-light .supplier-payment-history button{color:#342a17;border-color:#d3c18f;background:#fffaf0}.theme-light .fabric-search-results{border-color:#b58827;background:#fffdf7;box-shadow:0 16px 35px #75581735}.theme-light .fabric-search-results>button{color:#342a17;border-color:#e2d4ad}.theme-light .fabric-search-results small{color:#75694f}.theme-light .customer-result-list,.theme-light .customer-result-list>button{color:#342a17;border-color:#d2c092;background:#fffdf8}.theme-light .customer-result-list>button:hover,.theme-light .customer-result-list>button.selected{background:#f3e4b9}.theme-light .customer-debt{color:#8e2f1c;background:#ffe8df}.theme-light .business-message{color:#5d470e;background:#fff0bd}.theme-light .theme-switch{border-color:#c4a65d;background:#fffaf0}.theme-light .top-actions>button,.theme-light .business-head button{color:#3b2e16;border-color:#bfa259;background:#fff8e6}
 @media(max-width:760px){.theme-switch button{padding:0 6px!important}.fabric-search-results{right:0}.a5-financial-sheet{transform:scale(.65);transform-origin:top center;margin-bottom:-52mm}}
 @media(min-width:1001px){.business-form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* المظهر الأبيض والذهبي الكامل: وضوح النص وإزالة بقايا الأخضر */
+.theme-light .side-menu{color:#322511;border-color:#c89c3d;background:#fffaf0;box-shadow:0 14px 34px #7a571f24}
+.theme-light .side-menu>h2,.theme-light .greeting h1,.theme-light .greeting>span,.theme-light .greeting time{color:#35250f}
+.theme-light .greeting{border-color:#d7b96f;background:transparent}
+.theme-light .greeting p{color:#5b4930}
+.theme-light .metric-card,.theme-light .metric-card.tailored,.theme-light .metric-card.due{color:#30230f;border-color:#d1ad58;background:#fffaf0;box-shadow:0 10px 25px #79591c1c}
+.theme-light .metric-card p,.theme-light .metric-card strong{color:#35250f}
+.theme-light .metric-icon,.theme-light .tailored .metric-icon,.theme-light .due .metric-icon{color:#3a290d;background:#efd78f}
+.theme-light .session-card,.theme-light .session-card:hover{color:#35250f;border-color:#d0aa51;background:#fffaf0;box-shadow:0 10px 25px #79591c1c}
+.theme-light .session-heading small,.theme-light .session-dates small,.theme-light .session-runtime small{color:#705f43}
+.theme-light .session-dates{border-color:#d7bd7d}.theme-light .session-runtime b,.theme-light .session-action,.theme-light .session-kicker{color:#9a690d}
+.theme-light .work-board-column{color:#35250f;border-color:#cfa84e;background:#fffdf8;box-shadow:0 8px 20px #79591c18}
+.theme-light .work-board-column>header{color:#35250f;border-color:#c99b35;background:#efd78f}
+.theme-light .work-board-column h2{color:#35250f;font-weight:800}
+.theme-light .work-board-column header>b{color:#35250f;background:#fff8e4}
+.theme-light .work-board-search{border-color:#caa34e;background:#fff}
+.theme-light .work-board-search input{color:#35250f!important;background:transparent!important}
+.theme-light .work-board-search input::placeholder{color:#796a50}
+.theme-light .work-board-item{color:#35250f;border-color:#d8bc79;background:#fffaf0}
+.theme-light .work-board-item small,.theme-light .work-board-item small b{color:#77684e}
+.theme-light .work-board-actions button{color:#35250f;border-color:#c79d43;background:#f0d78d}
+.theme-light .work-board-actions .retreat{color:#4a3210;border-color:#b98a2f;background:#fff1c7}
+.theme-light .thobe-steps,.theme-light .order-actions{color:#35250f;border-color:#cda54b;background:#fffaf0}
+.theme-light .thobe-steps>span,.theme-light .thobe-steps button,.theme-light .order-actions button{color:#35250f;border-color:#c7a052;background:#fff8e8}
+.theme-light .thobe-steps button.selected,.theme-light .order-actions .primary-action{color:#35250f;background:#dfae3d}
+.theme-light .thobe-steps .copy-step{color:#35250f;background:#f2dfaa}
+.theme-light .compact-photo,.theme-light .compact-photo:hover,.theme-light .compact-photo>span{color:#35250f;border-color:#cba95e;background:#fff8e9}
+.theme-light .choice-switch button{color:#35250f;border-color:#cba95e;background:#fffaf0}
+.theme-light .choice-switch button.selected{color:#35250f;background:#dfae3d}
+.theme-light .compact-field small,.theme-light .stepper-arrows button{color:#35250f;border-color:#c6a354;background:#f1dda4}
+.theme-light .fabric-balance{color:#35250f;border-color:#cba95e;background:#fff4d1}
+.theme-light .compact-finance span,.theme-light .compact-remaining b,.theme-light .order-summary-strip span{color:#594522}
+.theme-light .compact-remaining{border-color:#bf8f2f;background:#fff0be}
+.theme-light .top-actions .theme-switch button{color:#604c29!important}
+.theme-light .top-actions .theme-switch button.selected{color:#35250f!important;background:#dfae3d!important}
