@@ -543,6 +543,27 @@ fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,Stri
 }
 
 #[tauri::command]
+fn update_customer(app:AppHandle,customer_id:i64,name:String,phone:String)->Result<Customer,String>{
+ let name=name.trim().to_string();let phone=phone.trim().to_string();
+ if name.is_empty(){return Err("اسم العميل مطلوب".into())}
+ if phone.chars().filter(|character|character.is_ascii_digit()).count()<7{return Err("رقم الجوال غير صحيح".into())}
+ let conn=db(&app)?;
+ let code:String=conn.query_row("SELECT customer_code FROM customers WHERE id=?1",[customer_id],|row|row.get(0)).map_err(|_|"العميل غير موجود".to_string())?;
+ conn.execute("UPDATE customers SET name=?1,phone=?2 WHERE id=?3",params![&name,&phone,customer_id]).map_err(|e|e.to_string())?;
+ Ok(Customer{id:customer_id,code,name,phone})
+}
+
+#[tauri::command]
+fn delete_customer(app:AppHandle,customer_id:i64)->Result<(),String>{
+ let conn=db(&app)?;
+ let invoice_count:i64=conn.query_row("SELECT COUNT(*) FROM invoices WHERE customer_id=?1",[customer_id],|row|row.get(0)).map_err(|e|e.to_string())?;
+ if invoice_count>0{return Err("لا يمكن حذف عميل لديه فواتير محفوظة. يمكنك تعديل بياناته بدلًا من الحذف.".into())}
+ let deleted=conn.execute("DELETE FROM customers WHERE id=?1",[customer_id]).map_err(|e|e.to_string())?;
+ if deleted==0{return Err("العميل غير موجود".into())}
+ Ok(())
+}
+
+#[tauri::command]
 fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,String>{
  let conn=db(&app)?;
  let query=query.trim().to_string();
@@ -1161,7 +1182,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
