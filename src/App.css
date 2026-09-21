@@ -223,3 +223,21 @@ button{font:inherit}
 .theme-light .compact-remaining{border-color:#bf8f2f;background:#fff0be}
 .theme-light .top-actions .theme-switch button{color:#604c29!important}
 .theme-light .top-actions .theme-switch button.selected{color:#35250f!important;background:#dfae3d!important}
+.theme-light .customer-search-head{border-color:#d3b268}
+.theme-light .customer-search-head>button{color:#35250f;border-color:#bd8f31;background:#f2dfaa}
+.theme-light .customer-table-head{color:#35250f;border-color:#c99d42;background:#efd78f}
+.theme-light .customer-result-list{border-color:#cda956;background:#fffdf8}
+.theme-light .customer-result-list>button{color:#35250f;border-color:#dfca96;background:#fffdf8}
+.theme-light .customer-result-data small,.theme-light .customer-result-data em{color:#75664b}
+.theme-light .customer-result-data em b,.theme-light .customer-result-number{color:#9a690d}
+.theme-light .customer-result-number{border-color:#d1ad61}
+.theme-light .selected-customer-head{border-color:#d3b36d}
+.theme-light .selected-customer-head p{color:#6d5d42}
+.theme-light .invoice-history-row{color:#35250f;border-color:#d2ad57;background:#fffaf0;box-shadow:0 6px 16px #79591c14}
+.theme-light .invoice-history-number{border-color:#c99b3d;background:#f4e4b6}
+.theme-light .invoice-history-number small{color:#6e5a35}
+.theme-light .invoice-history-number strong,.theme-light .invoice-history-data h3 span{color:#8e5e08}
+.theme-light .invoice-history-data p,.theme-light .invoice-history-data p b{color:#615136}
+.theme-light .invoice-history-actions button{color:#35250f;border-color:#c8a353;background:#fff8e8}
+.theme-light .invoice-history-actions .duplicate-invoice{color:#5e410d;border-color:#b98728;background:#f2d98e}
+.theme-light .customer-history-placeholder,.theme-light .customer-empty{color:#67583d}
