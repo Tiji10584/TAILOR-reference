@@ -121,7 +121,7 @@ struct SavedInvoice{
 #[serde(rename_all="camelCase")]
 struct ExtraTransactionPayload{
  transaction_type:String,customer_name:String,customer_phone:String,fabric_id:Option<i64>,
- quantity:i64,meters:f64,description:String,total_price:f64,payment_method:String
+ quantity:i64,meters:f64,description:String,total_price:f64,payment_method:String,worker_name:String
 }
 
 #[derive(Serialize)]
@@ -129,7 +129,7 @@ struct ExtraTransactionPayload{
 struct ExtraTransaction{
  id:i64,transaction_type:String,customer_name:String,customer_phone:String,fabric_id:Option<i64>,
  fabric_name:String,fabric_color:String,quantity:i64,meters:f64,description:String,total_price:f64,
- payment_method:String,created_at:String
+ payment_method:String,worker_name:String,created_at:String
 }
 
 #[derive(Serialize)]
@@ -341,6 +341,7 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"fabric_movements","unit_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"financial_entries","reference_type")?{conn.execute("ALTER TABLE financial_entries ADD COLUMN reference_type TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"financial_entries","reference_id")?{conn.execute("ALTER TABLE financial_entries ADD COLUMN reference_id INTEGER",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"extra_transactions","worker_name")?{conn.execute("ALTER TABLE extra_transactions ADD COLUMN worker_name TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
@@ -1034,13 +1035,13 @@ fn list_extra_transactions(app:AppHandle)->Result<Vec<ExtraTransaction>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
   "SELECT e.id,e.transaction_type,e.customer_name,e.customer_phone,e.fabric_id,
-          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.created_at
+          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.worker_name,e.created_at
    FROM extra_transactions e LEFT JOIN fabrics f ON f.id=e.fabric_id ORDER BY e.id DESC LIMIT 100"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|Ok(ExtraTransaction{
   id:row.get(0)?,transaction_type:row.get(1)?,customer_name:row.get(2)?,customer_phone:row.get(3)?,
   fabric_id:row.get(4)?,fabric_name:row.get(5)?,fabric_color:row.get(6)?,quantity:row.get(7)?,meters:row.get(8)?,
-  description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,created_at:row.get(12)?,
+  description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,worker_name:row.get(12)?,created_at:row.get(13)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
@@ -1061,9 +1062,9 @@ fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result
   if payload.meters>stock+0.0001{return Err(format!("المتوفر {:.2} متر فقط",stock))}
  }
  transaction.execute(
-  "INSERT INTO extra_transactions(transaction_type,customer_name,customer_phone,fabric_id,quantity,meters,description,total_price,payment_method,created_at)
-   VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,datetime('now','localtime'))",
-  params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method]
+  "INSERT INTO extra_transactions(transaction_type,customer_name,customer_phone,fabric_id,quantity,meters,description,total_price,payment_method,worker_name,created_at)
+   VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,datetime('now','localtime'))",
+  params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method,payload.worker_name.trim()]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  if payload.total_price>0.0001{
@@ -1085,12 +1086,12 @@ fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result
  }
  let result=transaction.query_row(
   "SELECT e.id,e.transaction_type,e.customer_name,e.customer_phone,e.fabric_id,
-          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.created_at
+          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.worker_name,e.created_at
    FROM extra_transactions e LEFT JOIN fabrics f ON f.id=e.fabric_id WHERE e.id=?1",
   [id],|row|Ok(ExtraTransaction{
    id:row.get(0)?,transaction_type:row.get(1)?,customer_name:row.get(2)?,customer_phone:row.get(3)?,
    fabric_id:row.get(4)?,fabric_name:row.get(5)?,fabric_color:row.get(6)?,quantity:row.get(7)?,meters:row.get(8)?,
-   description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,created_at:row.get(12)?,
+   description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,worker_name:row.get(12)?,created_at:row.get(13)?,
   })
  ).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
