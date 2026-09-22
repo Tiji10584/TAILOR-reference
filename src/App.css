@@ -331,3 +331,302 @@ button{font:inherit}
 .theme-light .repair-step-card{color:#252a31!important;border-color:#c7cbd1!important;background:#fff!important;box-shadow:0 8px 20px #1f293710}.theme-light .repair-step-card>header,.theme-light .repair-step-card>label{color:#252a31!important;border-color:#c7cbd1!important;background:#f3f2ee!important}.theme-light .repair-step-card>header>div>span{color:#8a6416!important}.theme-light .repair-step-card nav button,.theme-light .repair-step-card footer button{color:#fff!important;border-color:#596473!important;background:#46505e!important}.theme-light .repair-step-card nav button.selected{color:#252a31!important;border-color:#bd9135!important;background:#d4b15d!important}.theme-light .repair-step-card nav i{color:#815e18}.theme-light .repair-step-card textarea{color:#252a31!important;border-color:#aeb4bd!important;background:#fff!important}
 .theme-light .bulk-stage-head{border-color:#c7cbd1}.theme-light .bulk-stage-head>button{color:#fff!important;border-color:#596473!important;background:#46505e!important}.theme-light .bulk-stage-grid>section,.theme-light .bulk-transfer-page>header,.theme-light .bulk-transfer-page>footer{border-color:#c7cbd1!important;background:#fff!important}.theme-light .bulk-stage-grid h2{color:#252a31!important;border-color:#c7cbd1!important;background:#f1f0ec!important}.theme-light .bulk-stage-grid h2 b{color:#fff!important;background:#596473!important}.theme-light .bulk-stage-grid label{color:#252a31!important;border-color:#d3d6da!important;background:#f7f6f2!important}.theme-light .bulk-stage-grid label:has(input:checked){border-color:#bd9135!important;background:#f5e6b9!important}.theme-light .bulk-stage-grid label small{color:#68717d!important}.theme-light .bulk-transfer-page>header button,.theme-light .bulk-transfer-page>footer select{color:#fff!important;border-color:#596473!important;background:#46505e!important}
 @media(max-width:1150px){.finance-date-tools{grid-template-columns:1fr 1fr}.repair-step-card{grid-template-columns:1fr}.repair-step-card>header,.repair-step-card>label,.repair-step-card>footer{grid-column:1;grid-row:auto}}
+
+
+/* ===== 2026-09-22: beige + gray light identity, reports and repair cards ===== */
+.theme-switch{border-color:#77736d;background:#e8e3db}
+.theme-switch button{color:#5f5b55!important}
+.theme-switch button.selected{color:#fff!important;background:#626568!important}
+
+.app-lock-shell.theme-light{
+  color:#2f3031;
+  background:radial-gradient(circle at 50% 18%,#f4f1eb 0,transparent 42%),#e7e2da;
+}
+.app-lock-shell.theme-light .app-lock-card{
+  color:#2f3031;
+  border-color:#c8c3ba;
+  background:#f8f6f1;
+  box-shadow:0 24px 70px #46433e20;
+}
+.app-lock-shell.theme-light .app-lock-logo{
+  color:#fff;
+  background:linear-gradient(135deg,#73777a,#55595c);
+  box-shadow:0 10px 26px #4b4d4f28;
+}
+.app-lock-shell.theme-light .app-lock-card small,
+.app-lock-shell.theme-light .app-lock-card p{color:#77736d}
+.app-lock-shell.theme-light .app-lock-card input{
+  color:#2f3031;
+  border-color:#bbb7af;
+  background:#fff;
+}
+.app-lock-shell.theme-light .app-lock-card button{
+  color:#fff;
+  border-color:#66696b;
+  background:#66696b;
+}
+
+.app-shell.theme-light{
+  color:#303133;
+  background:linear-gradient(135deg,#efebe4 0%,#e4dfd7 52%,#d9d5ce 100%);
+}
+.app-shell.theme-light .topbar{border-color:#c5c0b8}
+.app-shell.theme-light .brand>span{
+  color:#fff;
+  background:linear-gradient(135deg,#74777a,#55585a);
+  box-shadow:0 8px 18px #3e414326;
+}
+.app-shell.theme-light .brand small,
+.app-shell.theme-light .topbar time,
+.app-shell.theme-light .side-label,
+.app-shell.theme-light .greeting>span,
+.app-shell.theme-light .business-head span,
+.app-shell.theme-light .management-head span,
+.app-shell.theme-light .customer-search-head span,
+.app-shell.theme-light .settings-title span{color:#74716c!important}
+
+.app-shell.theme-light .side-menu,
+.app-shell.theme-light .greeting,
+.app-shell.theme-light .metric-card,
+.app-shell.theme-light .work-board-column,
+.app-shell.theme-light .management-page,
+.app-shell.theme-light .business-page,
+.app-shell.theme-light .customer-search-page,
+.app-shell.theme-light .settings-page,
+.app-shell.theme-light .order-page,
+.app-shell.theme-light .business-form,
+.app-shell.theme-light .business-list,
+.app-shell.theme-light .module-list,
+.app-shell.theme-light .customer-results-panel,
+.app-shell.theme-light .customer-history-panel,
+.app-shell.theme-light .measure-column,
+.app-shell.theme-light .repair-garments-card,
+.app-shell.theme-light .extra-history,
+.app-shell.theme-light .finance-metrics article,
+.app-shell.theme-light .report-cards article,
+.app-shell.theme-light .report-money article,
+.app-shell.theme-light .bulk-transfer-page>header,
+.app-shell.theme-light .bulk-transfer-page>footer,
+.app-shell.theme-light .bulk-stage-grid>section,
+.app-shell.theme-light .report-filter,
+.app-shell.theme-light .pin-gate{
+  color:#303133!important;
+  border-color:#c9c4bc!important;
+  background:#f7f5f1!important;
+  box-shadow:0 10px 28px #4b49451a!important;
+}
+
+.app-shell.theme-light .greeting{
+  background:linear-gradient(145deg,#f9f7f3,#ece8e1)!important;
+  border:1px solid #c9c4bc;
+}
+.app-shell.theme-light .greeting h1,
+.app-shell.theme-light .business-head h1,
+.app-shell.theme-light .management-head h1,
+.app-shell.theme-light .customer-search-head h1,
+.app-shell.theme-light .settings-title h1{color:#292b2d!important}
+.app-shell.theme-light .greeting p,
+.app-shell.theme-light .business-head p,
+.app-shell.theme-light .management-head p,
+.app-shell.theme-light .customer-search-head p,
+.app-shell.theme-light small{color:#77736d!important}
+
+.app-shell.theme-light .nav-card,
+.app-shell.theme-light .work-board-item,
+.app-shell.theme-light .module-list article,
+.app-shell.theme-light .extra-history article,
+.app-shell.theme-light .finance-entry-list article,
+.app-shell.theme-light .campaign-history article,
+.app-shell.theme-light .supplier-payment-history button,
+.app-shell.theme-light .inventory-card,
+.app-shell.theme-light .overdue-page-list article,
+.app-shell.theme-light .bulk-stage-grid label,
+.app-shell.theme-light .repair-garment-item{
+  color:#303133!important;
+  border-color:#d0cbc3!important;
+  background:#fbfaf7!important;
+}
+.app-shell.theme-light .nav-card:hover,
+.app-shell.theme-light .work-board-item:hover,
+.app-shell.theme-light .inventory-card:hover{
+  color:#202224!important;
+  border-color:#99958e!important;
+  background:#efede8!important;
+}
+.app-shell.theme-light .nav-icon,
+.app-shell.theme-light .nav-card.is-enabled .nav-icon{
+  color:#4d5052!important;
+  background:#dedbd5!important;
+}
+.app-shell.theme-light .metric-icon{color:#55595b!important;background:#e0ddd7!important}
+.app-shell.theme-light .metric-card strong{color:#303133!important}
+
+.app-shell.theme-light input,
+.app-shell.theme-light select,
+.app-shell.theme-light textarea,
+.app-shell.theme-light .fabric-search-picker input{
+  color:#2d2f31!important;
+  border-color:#beb9b1!important;
+  background:#fff!important;
+}
+.app-shell.theme-light input:focus,
+.app-shell.theme-light select:focus,
+.app-shell.theme-light textarea:focus{
+  border-color:#777a7c!important;
+  box-shadow:0 0 0 3px #777a7c20!important;
+}
+.app-shell.theme-light button:not(.danger-button){
+  border-color:#aaa59d;
+}
+.app-shell.theme-light .primary-action,
+.app-shell.theme-light .save-customer,
+.app-shell.theme-light .report-print-button,
+.app-shell.theme-light .report-today-button,
+.app-shell.theme-light .business-form>button[type="submit"],
+.app-shell.theme-light .bulk-transfer-page>footer>button{
+  color:#fff!important;
+  border-color:#626568!important;
+  background:#626568!important;
+}
+.app-shell.theme-light .income-switch button.selected,
+.app-shell.theme-light .report-period-switch button.selected,
+.app-shell.theme-light .unit-switch button.selected{
+  color:#fff!important;
+  border-color:#626568!important;
+  background:#626568!important;
+}
+
+.app-shell.theme-light .locked-date,
+.app-shell.theme-light .report-auto-note,
+.app-shell.theme-light .compact-remaining{
+  color:#303133!important;
+  border-color:#cbc6be!important;
+  background:#ebe8e2!important;
+}
+.app-shell.theme-light .locked-date b,
+.app-shell.theme-light .report-auto-note b,
+.app-shell.theme-light .compact-remaining b{color:#44474a!important}
+
+/* Reports: clear square cards and organized controls */
+.report-filter{
+  display:grid!important;
+  grid-template-columns:minmax(260px,1.5fr) minmax(190px,.8fr) minmax(220px,1fr) auto auto;
+  align-items:end!important;
+  gap:12px!important;
+  padding:16px!important;
+}
+.report-period-switch{display:grid;gap:7px}
+.report-period-switch>span,.report-date-control>span{font-size:.72rem;font-weight:700}
+.report-period-switch>div{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.report-period-switch button,.report-today-button,.report-print-button{min-height:42px;border-radius:10px}
+.report-date-control{display:grid;gap:7px}
+.report-date-control input{height:42px}
+.report-auto-note{display:grid;gap:3px;min-height:58px;padding:9px 12px;border:1px solid #3a5d51;border-radius:11px}
+.report-cards{
+  grid-template-columns:repeat(3,minmax(150px,1fr))!important;
+  gap:12px!important;
+}
+.report-money{
+  grid-template-columns:repeat(3,minmax(150px,1fr))!important;
+  gap:12px!important;
+}
+.report-cards article,.report-money article{
+  min-height:145px;
+  aspect-ratio:1.25/1;
+  place-content:center;
+  text-align:center;
+  border-radius:16px!important;
+}
+.report-cards span,.report-money span{font-size:.78rem!important}
+.report-cards b,.report-money b{font-size:1.35rem!important}
+
+/* Repair: each garment is an independent visible card */
+.repair-garments-card{
+  display:grid;
+  gap:14px;
+  margin:16px 0;
+  padding:16px;
+  border:1px solid #365b4f;
+  border-radius:16px;
+  background:#10241e;
+}
+.repair-garments-card>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+.repair-garments-card>header h2{margin:3px 0}
+.repair-garments-card>header p{margin:0;color:#9fb1a9;font-size:.76rem}
+.repair-garment-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:12px;
+}
+.repair-garment-item{
+  display:grid;
+  gap:11px;
+  padding:14px;
+  border:1px solid #365b4f;
+  border-radius:14px;
+  background:#0c1d18;
+}
+.repair-garment-item>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.repair-garment-item>header span{font-size:.72rem;color:#c9ad60}
+.repair-item-fields{display:grid;grid-template-columns:1.35fr .65fr;gap:9px}
+.repair-garment-item label{display:grid;gap:6px}
+.repair-garment-item label>span{font-size:.7rem}
+.repair-garment-item select,.repair-garment-item input,.repair-garment-item textarea{
+  width:100%;
+  border:1px solid #4e7065;
+  border-radius:9px;
+  color:#fff;
+  background:#081713;
+}
+.repair-garment-item select,.repair-garment-item input{height:42px;padding:0 10px}
+.repair-garment-item textarea{min-height:92px;padding:10px;resize:vertical}
+.repair-garments-card>footer{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  padding-top:12px;
+  border-top:1px solid #365b4f;
+}
+.repair-garments-card>footer b{font-size:1.15rem}
+
+/* Bulk transfer: emphasize select-all controls and selected count */
+.bulk-transfer-page>header{flex-wrap:wrap}
+.bulk-transfer-page>header>div{flex-wrap:wrap}
+.bulk-transfer-page>header strong{
+  padding:8px 12px;
+  border:1px solid #5f625f;
+  border-radius:10px;
+}
+.bulk-stage-head button{white-space:nowrap}
+.bulk-stage-grid label:has(input:checked){
+  outline:2px solid #7a7d7f;
+  outline-offset:-2px;
+}
+
+/* Better light-mode contrast for headings/section labels */
+.app-shell.theme-light .report-result-title,
+.app-shell.theme-light .finance-period-title,
+.app-shell.theme-light .extra-history h2,
+.app-shell.theme-light .repair-garment-item strong{color:#2d2f31!important}
+
+@media(max-width:1100px){
+  .report-filter{grid-template-columns:1fr 1fr!important}
+  .report-cards,.report-money{grid-template-columns:repeat(2,minmax(150px,1fr))!important}
+}
+@media(max-width:720px){
+  .report-filter{grid-template-columns:1fr!important}
+  .report-cards,.report-money{grid-template-columns:1fr!important}
+  .report-cards article,.report-money article{aspect-ratio:auto;min-height:118px}
+  .repair-item-fields{grid-template-columns:1fr}
+}
