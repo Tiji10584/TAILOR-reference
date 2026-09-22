@@ -353,6 +353,14 @@ fn db(app:&AppHandle)->Result<Connection,String>{
   FROM invoices i
   WHERE CAST(NULLIF(i.paid_amount,'') AS REAL)>0
     AND NOT EXISTS(SELECT 1 FROM financial_entries f WHERE f.invoice_id=i.id AND f.entry_type='دفعة فاتورة');
+  INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at,reference_type,reference_id)
+  SELECT e.transaction_type,NULL,e.transaction_type || ' — ' || e.customer_name || ' — فاتورة ' || e.id,e.total_price,e.payment_method,e.created_at,'دخل إضافي',e.id
+  FROM extra_transactions e
+  WHERE e.total_price>0
+    AND NOT EXISTS(
+      SELECT 1 FROM financial_entries f
+      WHERE f.reference_type='دخل إضافي' AND f.reference_id=e.id
+    );
  ").map_err(|e|e.to_string())?;
  Ok(conn)
 }
