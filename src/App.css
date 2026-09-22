@@ -980,3 +980,20 @@ button{font:inherit}
   background:#faf8f4!important;
 }
 .app-shell.theme-light .picker-options>button *{color:inherit!important}
+
+
+/* Explicit dashboard root coverage for the light theme audit */
+.app-shell.theme-light .dashboard{
+  color:#303235!important;
+}
+.app-shell.theme-light .dashboard :where(h1,h2,h3,h4,p,span,strong,b,small,em,label){
+  color:#303235!important;
+}
+.app-shell.theme-light .dashboard :where(p,small,em){
+  color:#696b6e!important;
+}
+.app-shell.theme-light .dashboard .work-board-column>header *,
+.app-shell.theme-light .dashboard .work-board-actions button,
+.app-shell.theme-light .dashboard .work-board-actions button *{
+  color:#fff!important;
+}
