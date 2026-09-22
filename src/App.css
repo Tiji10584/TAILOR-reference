@@ -740,3 +740,243 @@ button{font:inherit}
   border-color:#c3beb6!important;
   background:#e9e6e0!important;
 }
+
+
+/* ===== 2026-09-22 LIGHT THEME CONTRAST HARDENING =====
+   In light mode, every application page defaults to readable charcoal text.
+   White text is allowed only on explicitly dark/primary controls below. */
+.app-shell.theme-light :where(
+  .dashboard,
+  .customer-workspace,
+  .customer-search-page,
+  .business-page,
+  .management-page,
+  .order-page,
+  .settings-page,
+  .history-dialog
+) :where(h1,h2,h3,h4,p,span,strong,b,small,em,label){
+  color:#303235!important;
+}
+
+.app-shell.theme-light :where(
+  .dashboard,
+  .customer-workspace,
+  .customer-search-page,
+  .business-page,
+  .management-page,
+  .order-page,
+  .settings-page,
+  .history-dialog
+) :where(p,small,em){
+  color:#696b6e!important;
+}
+
+.app-shell.theme-light :where(
+  .customer-fields,
+  .business-form,
+  .customer-search-form,
+  .customer-edit-form,
+  .compact-field,
+  .compact-select,
+  .compact-notes,
+  .finance-inputs,
+  .repair-garment-item,
+  .report-filter
+) label>span{
+  color:#484b4e!important;
+  font-weight:700;
+}
+
+.app-shell.theme-light input,
+.app-shell.theme-light select,
+.app-shell.theme-light textarea{
+  color:#292b2e!important;
+  caret-color:#292b2e!important;
+  background:#fff!important;
+  border-color:#aaa8a3!important;
+}
+
+.app-shell.theme-light input::placeholder,
+.app-shell.theme-light textarea::placeholder{
+  color:#777a7d!important;
+  opacity:1!important;
+}
+
+.app-shell.theme-light input:disabled,
+.app-shell.theme-light select:disabled,
+.app-shell.theme-light textarea:disabled{
+  color:#626568!important;
+  background:#e8e5df!important;
+  opacity:1!important;
+}
+
+/* Add customer: explicit coverage for the screen shown in the bug report */
+.app-shell.theme-light .customer-workspace{
+  color:#303235!important;
+  background:#f7f5f1!important;
+}
+.app-shell.theme-light .customer-page-head>span{color:#71685e!important}
+.app-shell.theme-light .customer-page-head h1{color:#25272a!important}
+.app-shell.theme-light .customer-page-head p{color:#66696c!important}
+.app-shell.theme-light .customer-form{
+  border-color:#c8c3bb!important;
+  background:#f4f1eb!important;
+  box-shadow:0 18px 46px #4a47421a!important;
+}
+.app-shell.theme-light .customer-fields label span{color:#45484b!important}
+.app-shell.theme-light .customer-fields input{
+  color:#292b2e!important;
+  background:#fff!important;
+  border-color:#aaa8a3!important;
+}
+.app-shell.theme-light .customer-fields input::placeholder{color:#777a7d!important}
+.app-shell.theme-light .customer-actions{border-color:#c9c5bd!important}
+.app-shell.theme-light .page-close{
+  color:#fff!important;
+  border-color:#565b5e!important;
+  background:#565b5e!important;
+}
+.app-shell.theme-light .page-close:hover{
+  color:#fff!important;
+  border-color:#44484b!important;
+  background:#44484b!important;
+}
+.app-shell.theme-light .save-customer{
+  color:#fff!important;
+  border-color:#5d6265!important;
+  background:#5d6265!important;
+}
+.app-shell.theme-light .clear-customer{
+  color:#34373a!important;
+  border-color:#aaa69f!important;
+  background:#e5e1da!important;
+}
+.app-shell.theme-light .cancel-customer{
+  color:#6b3328!important;
+  border-color:#cdb3aa!important;
+  background:#f1e5e1!important;
+}
+
+/* Neutral buttons are always readable in light mode */
+.app-shell.theme-light :where(
+  .business-page,
+  .management-page,
+  .customer-search-page,
+  .order-page,
+  .settings-page,
+  .history-dialog
+) button{
+  color:#34373a!important;
+}
+.app-shell.theme-light :where(
+  .business-page,
+  .management-page,
+  .customer-search-page,
+  .order-page,
+  .settings-page,
+  .history-dialog
+) button *{
+  color:inherit!important;
+}
+
+/* Dark/primary/selected controls: restore white text explicitly */
+.app-shell.theme-light :where(
+  .primary-action,
+  .save-customer,
+  .report-print-button,
+  .report-today-button,
+  .income-switch button.selected,
+  .report-period-switch button.selected,
+  .unit-switch button.selected,
+  .finance-categories button.selected,
+  .supplier-panel-tabs button.selected,
+  .thobe-steps button.selected,
+  .quick-description button.selected,
+  .bulk-transfer-page>footer>button,
+  .selected-customer-actions button:first-child,
+  .storage-actions .storage-copy-button,
+  .invoice-history-actions .duplicate-invoice,
+  .work-board-actions button,
+  .bulk-stage-head>button
+),
+.app-shell.theme-light :where(
+  .primary-action,
+  .save-customer,
+  .report-print-button,
+  .report-today-button,
+  .income-switch button.selected,
+  .report-period-switch button.selected,
+  .unit-switch button.selected,
+  .finance-categories button.selected,
+  .supplier-panel-tabs button.selected,
+  .thobe-steps button.selected,
+  .quick-description button.selected,
+  .bulk-transfer-page>footer>button,
+  .selected-customer-actions button:first-child,
+  .storage-actions .storage-copy-button,
+  .invoice-history-actions .duplicate-invoice,
+  .work-board-actions button,
+  .bulk-stage-head>button
+) *{
+  color:#fff!important;
+}
+
+/* Dark section headers retain enough contrast */
+.app-shell.theme-light .work-board-column>header,
+.app-shell.theme-light .finance-table>header{
+  color:#fff!important;
+  background:#5b6064!important;
+  border-color:#5b6064!important;
+}
+.app-shell.theme-light .work-board-column>header *,
+.app-shell.theme-light .finance-table>header *{
+  color:#fff!important;
+}
+
+/* Status/error colors stay readable on pale surfaces */
+.app-shell.theme-light .customer-error,
+.app-shell.theme-light .error{
+  color:#8c3025!important;
+}
+.app-shell.theme-light .danger-button,
+.app-shell.theme-light .delete-customer{
+  color:#7a2d22!important;
+  border-color:#c9aaa2!important;
+  background:#f2e1dd!important;
+}
+
+/* Search/results/history: remove any surviving pale text from dark-theme rules */
+.app-shell.theme-light .customer-result-data :where(strong,b),
+.app-shell.theme-light .invoice-history-data :where(h3,b),
+.app-shell.theme-light .selected-customer-head :where(h2,b),
+.app-shell.theme-light .history-row :where(strong,b,span),
+.app-shell.theme-light .extra-history :where(strong,b,p),
+.app-shell.theme-light .finance-entry-list :where(strong,b,p,span),
+.app-shell.theme-light .movement-list :where(strong,b,p,span){
+  color:#303235!important;
+}
+.app-shell.theme-light .customer-result-data :where(small,em),
+.app-shell.theme-light .invoice-history-data p,
+.app-shell.theme-light .history-row small,
+.app-shell.theme-light .extra-history small,
+.app-shell.theme-light .finance-entry-list small,
+.app-shell.theme-light .movement-list small{
+  color:#696b6e!important;
+}
+
+/* Light-mode modal/dialog controls also use readable neutrals */
+.app-shell.theme-light .picker-dialog,
+.app-shell.theme-light .preview-dialog{
+  color:#303235!important;
+  border-color:#c7c2ba!important;
+  background:#f3f0ea!important;
+}
+.app-shell.theme-light .picker-dialog :where(h1,h2,h3,p,span,strong,b,small,label){
+  color:#303235!important;
+}
+.app-shell.theme-light .picker-options>button{
+  color:#303235!important;
+  border-color:#c8c3bb!important;
+  background:#faf8f4!important;
+}
+.app-shell.theme-light .picker-options>button *{color:inherit!important}
