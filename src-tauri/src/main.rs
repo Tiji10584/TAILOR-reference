@@ -339,6 +339,8 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"fabric_movements","meters_per_carton")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN meters_per_carton REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"fabric_movements","total_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN total_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"fabric_movements","unit_cost")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"financial_entries","reference_type")?{conn.execute("ALTER TABLE financial_entries ADD COLUMN reference_type TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"financial_entries","reference_id")?{conn.execute("ALTER TABLE financial_entries ADD COLUMN reference_id INTEGER",[]).map_err(|e|e.to_string())?;}
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
@@ -1064,6 +1066,12 @@ fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result
   params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
+ if payload.total_price>0.0001{
+  transaction.execute(
+   "INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at,reference_type,reference_id) VALUES(?1,NULL,?2,?3,?4,datetime('now','localtime'),'دخل إضافي',?5)",
+   params![transaction_type,format!("{} — {} — فاتورة {}",transaction_type,payload.customer_name.trim(),id),payload.total_price,&payload.payment_method,id]
+  ).map_err(|e|e.to_string())?;
+ }
  if transaction_type=="بيع قماش"{
   let fabric_id=payload.fabric_id.unwrap();
   let stock:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|e|e.to_string())?;
