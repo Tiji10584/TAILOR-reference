@@ -1981,6 +1981,183 @@ button{font:inherit}
   background:var(--accent)!important;
 }
 
+
+/* ---------- Remaining application surfaces ---------- */
+.finance-layout,
+.whatsapp-layout,
+.module-split,
+.income-layout{
+  color:var(--text)!important;
+}
+
+.finance-metrics article,
+.month-metrics article,
+.debt-list article,
+.debt-payment,
+.finance-table,
+.finance-entry-list,
+.finance-date-tools,
+.finance-search-date,
+.finance-categories,
+.extra-date-tools,
+.filtered-extra-list,
+.whatsapp-form,
+.notes-list,
+.distribution-board,
+.inventory-grid,
+.supplier-account-list,
+.supplier-account-values,
+.supplier-identity,
+.supplier-payment-form,
+.supplier-payment-history,
+.supply-calculation,
+.restock-form,
+.restock-result,
+.fabric-alerts,
+.customer-selector,
+.selection-summary,
+.pin-gate,
+.feature-disabled,
+.locked-date,
+.low-stock-confirm,
+.report-auto-note{
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+  background:var(--surface)!important;
+  box-shadow:none!important;
+}
+
+.finance-metrics article,
+.month-metrics article,
+.debt-list article,
+.supplier-payment-history button,
+.movement-list article,
+.notes-list article,
+.distribution-board article,
+.inventory-grid article,
+.fabric-alerts article{
+  border:1px solid var(--line)!important;
+  border-radius:11px!important;
+  background:var(--surface-soft)!important;
+}
+
+.finance-metrics article span,
+.month-metrics article span,
+.debt-list article span,
+.supplier-account-values span,
+.supplier-identity span,
+.supply-calculation span,
+.restock-result span{
+  color:var(--muted)!important;
+}
+
+.finance-metrics article b,
+.month-metrics article b,
+.debt-list article b,
+.supplier-account-values b,
+.supplier-identity b,
+.supply-calculation b,
+.restock-result b{
+  color:var(--text)!important;
+}
+
+.finance-categories button,
+.supplier-panel-tabs button,
+.supply-unit-switch button{
+  color:var(--text)!important;
+  border:1px solid var(--line)!important;
+  background:var(--surface-muted)!important;
+}
+
+.finance-table>header,
+.distribution-board>header{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.finance-table>header *,
+.distribution-board>header *{
+  color:#fff!important;
+}
+
+.supplier-payment-form button[type="submit"],
+.restock-form button[type="submit"],
+.whatsapp-form button[type="submit"]{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.supplier-payment-form button[type="submit"] *,
+.restock-form button[type="submit"] *,
+.whatsapp-form button[type="submit"] *{
+  color:#fff!important;
+}
+
+.danger-button,
+.delete-customer{
+  color:var(--danger)!important;
+  border-color:#c9aaa2!important;
+  background:var(--danger-soft)!important;
+}
+
+.business-message,
+.customer-search-message,
+.settings-message{
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+  background:var(--surface-muted)!important;
+}
+
+.customer-error,
+.error,
+.settings-alert{
+  color:var(--danger)!important;
+}
+
+/* Neutral buttons: white/light surface with dark text */
+.management-head>button,
+.business-head>button,
+.customer-search-head>button,
+.settings-storage-actions button:not(.settings-primary),
+.invoice-history-actions button,
+.selected-customer-actions button,
+.finance-date-tools button,
+.extra-date-tools button,
+.history-head button,
+.preview-tools button,
+.picker-dialog button,
+.movement-dialog button{
+  color:var(--text)!important;
+  border-color:var(--line-strong)!important;
+  background:var(--surface)!important;
+}
+
+.management-head>button:hover,
+.business-head>button:hover,
+.customer-search-head>button:hover,
+.settings-storage-actions button:not(.settings-primary):hover,
+.invoice-history-actions button:hover,
+.selected-customer-actions button:hover,
+.finance-date-tools button:hover,
+.extra-date-tools button:hover{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.management-head>button:hover *,
+.business-head>button:hover *,
+.customer-search-head>button:hover *,
+.settings-storage-actions button:not(.settings-primary):hover *,
+.invoice-history-actions button:hover *,
+.selected-customer-actions button:hover *,
+.finance-date-tools button:hover *,
+.extra-date-tools button:hover *{
+  color:#fff!important;
+}
+
 /* ---------- Responsive ---------- */
 @media(max-width:1500px){
   .workspace{
