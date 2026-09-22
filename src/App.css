@@ -997,3 +997,756 @@ button{font:inherit}
 .app-shell.theme-light .dashboard .work-board-actions button *{
   color:#fff!important;
 }
+
+
+/* =========================================================
+   2026-09-22 FINAL LIGHT UI REWORK
+   - Remove gold from the light identity
+   - Reduce dashboard box density
+   - Redesign Settings V2
+   ========================================================= */
+
+/* ---------- Light palette: beige + graphite only ---------- */
+.app-shell.theme-light{
+  --lt-bg:#e9e5de;
+  --lt-bg-2:#f1eee8;
+  --lt-surface:#f8f6f2;
+  --lt-surface-2:#eeebe5;
+  --lt-line:#c9c5be;
+  --lt-line-strong:#aaa6a0;
+  --lt-text:#2e3032;
+  --lt-muted:#6d7072;
+  --lt-accent:#5d6266;
+  --lt-accent-dark:#454a4e;
+  --lt-danger:#7b362c;
+  background:linear-gradient(135deg,var(--lt-bg-2),var(--lt-bg))!important;
+  color:var(--lt-text)!important;
+}
+
+/* No gold on the light UI: top bar, brand, navigation, labels and focus states */
+.app-shell.theme-light .topbar{
+  border-color:var(--lt-line)!important;
+}
+.app-shell.theme-light .brand>span{
+  color:#fff!important;
+  background:linear-gradient(145deg,#6b7073,#4f5457)!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .side-label,
+.app-shell.theme-light .greeting>span,
+.app-shell.theme-light .greeting time,
+.app-shell.theme-light .session-kicker,
+.app-shell.theme-light .session-action,
+.app-shell.theme-light .settings-hero-copy>span,
+.app-shell.theme-light .settings-section-heading span,
+.app-shell.theme-light .customer-page-head>span,
+.app-shell.theme-light .business-head>div>span,
+.app-shell.theme-light .management-head>div>span,
+.app-shell.theme-light .customer-search-head>div>span{
+  color:#666a6d!important;
+}
+
+.app-shell.theme-light :where(input,select,textarea,button):focus-visible{
+  outline:2px solid #73787b!important;
+  outline-offset:2px!important;
+}
+.app-shell.theme-light :where(input,select,textarea):focus{
+  border-color:#777c7f!important;
+  box-shadow:0 0 0 3px #777c7f1f!important;
+}
+
+/* Top actions: no gold */
+.app-shell.theme-light .top-actions{
+  gap:9px!important;
+}
+.app-shell.theme-light .top-actions>button,
+.app-shell.theme-light .theme-switch{
+  color:#3d4042!important;
+  border-color:#bbb7b0!important;
+  background:#f4f1eb!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .top-actions>button:hover{
+  color:#fff!important;
+  border-color:#5d6266!important;
+  background:#5d6266!important;
+  transform:none!important;
+}
+.app-shell.theme-light .theme-switch button{
+  color:#525659!important;
+  background:transparent!important;
+}
+.app-shell.theme-light .theme-switch button.selected{
+  color:#fff!important;
+  background:#5d6266!important;
+}
+
+/* ---------- Dashboard: reduce nested boxes ---------- */
+.app-shell.theme-light .workspace{
+  gap:20px!important;
+}
+.app-shell.theme-light .side-menu{
+  padding:8px 8px 10px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .side-label{
+  margin:0 10px 8px!important;
+  padding-bottom:8px!important;
+  border-bottom:1px solid var(--lt-line)!important;
+}
+.app-shell.theme-light .side-cards{
+  gap:0!important;
+}
+.app-shell.theme-light .nav-card,
+.app-shell.theme-light .nav-card.is-enabled{
+  min-height:52px!important;
+  padding:7px 9px!important;
+  border:0!important;
+  border-bottom:1px solid #d4d0c9!important;
+  border-radius:0!important;
+  color:#343638!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.app-shell.theme-light .nav-card:last-child{
+  border-bottom:0!important;
+}
+.app-shell.theme-light .nav-card:hover,
+.app-shell.theme-light .nav-card.is-enabled:hover{
+  color:#252729!important;
+  border-color:#d4d0c9!important;
+  background:#e5e2dc!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.app-shell.theme-light .nav-icon,
+.app-shell.theme-light .nav-card.is-enabled .nav-icon{
+  width:34px!important;
+  height:34px!important;
+  border-radius:10px!important;
+  color:#515558!important;
+  background:#dedbd5!important;
+}
+.app-shell.theme-light .nav-card:hover .nav-icon,
+.app-shell.theme-light .nav-card.is-enabled:hover .nav-icon{
+  color:#fff!important;
+  background:#676c70!important;
+  transform:none!important;
+}
+
+/* Greeting becomes a clean header, not another card */
+.app-shell.theme-light .greeting{
+  min-height:82px!important;
+  padding:6px 4px 12px!important;
+  border:0!important;
+  border-bottom:1px solid var(--lt-line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .greeting h1{
+  color:#27292b!important;
+  font-size:clamp(1.55rem,2.2vw,2.2rem)!important;
+}
+.app-shell.theme-light .greeting p{
+  color:#717477!important;
+}
+
+/* Three metrics remain, but flat and compact */
+.app-shell.theme-light .metric-grid{
+  gap:10px!important;
+  padding-top:10px!important;
+}
+.app-shell.theme-light .metric-card,
+.app-shell.theme-light .metric-card.tailored,
+.app-shell.theme-light .metric-card.due{
+  min-height:78px!important;
+  grid-template-columns:auto 1fr!important;
+  grid-template-rows:1fr!important;
+  align-items:center!important;
+  gap:12px!important;
+  padding:10px 14px!important;
+  border:0!important;
+  border-inline-start:3px solid #8a8e91!important;
+  border-radius:8px!important;
+  background:#f6f3ee!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .metric-icon,
+.app-shell.theme-light .tailored .metric-icon,
+.app-shell.theme-light .due .metric-icon{
+  width:34px!important;
+  height:34px!important;
+  grid-column:auto!important;
+  grid-row:auto!important;
+  border-radius:9px!important;
+  color:#fff!important;
+  background:#656a6e!important;
+  font-size:1rem!important;
+}
+.app-shell.theme-light .metric-card p{
+  grid-column:2!important;
+  grid-row:1!important;
+  justify-self:start!important;
+  align-self:start!important;
+  color:#65686a!important;
+  font-size:.68rem!important;
+}
+.app-shell.theme-light .metric-card strong{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:end!important;
+  justify-self:start!important;
+  width:auto!important;
+  color:#2e3032!important;
+  font-size:1.65rem!important;
+  line-height:1!important;
+}
+
+/* Work board: columns separated by lines; jobs are rows, not cards */
+.app-shell.theme-light .work-board{
+  gap:0!important;
+  border-top:1px solid var(--lt-line)!important;
+  border-bottom:1px solid var(--lt-line)!important;
+  background:#f5f2ed!important;
+}
+.app-shell.theme-light .work-board-column{
+  border:0!important;
+  border-inline-start:1px solid #d3cfc8!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.app-shell.theme-light .work-board-column:first-child{
+  border-inline-start:0!important;
+}
+.app-shell.theme-light .work-board-column:hover{
+  border-color:#d3cfc8!important;
+  transform:none!important;
+}
+.app-shell.theme-light .work-board-column>header{
+  min-height:40px!important;
+  padding:7px 9px!important;
+  border:0!important;
+  border-bottom:1px solid #d3cfc8!important;
+  color:#303235!important;
+  background:#ebe8e2!important;
+}
+.app-shell.theme-light .work-board-column>header *{
+  color:#303235!important;
+}
+.app-shell.theme-light .work-board-column header>b{
+  width:auto!important;
+  min-width:25px!important;
+  height:24px!important;
+  padding:0 7px!important;
+  border-radius:999px!important;
+  color:#fff!important;
+  background:#666b6f!important;
+}
+.app-shell.theme-light .work-board-search{
+  height:34px!important;
+  margin:6px 8px!important;
+  padding:0 6px!important;
+  border:0!important;
+  border-bottom:1px solid #c9c5be!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .work-board-search:focus-within{
+  border-color:#6e7376!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .work-board-search>span{
+  color:#777b7e!important;
+}
+.app-shell.theme-light .work-board-search input{
+  color:#323436!important;
+  background:transparent!important;
+}
+.app-shell.theme-light .work-board-search input::placeholder{
+  color:#8a8d8f!important;
+}
+.app-shell.theme-light .work-board-column>div{
+  padding:0 8px 6px!important;
+}
+.app-shell.theme-light .work-board-item{
+  gap:6px!important;
+  margin:0!important;
+  padding:8px 2px!important;
+  border:0!important;
+  border-bottom:1px solid #ddd9d2!important;
+  border-radius:0!important;
+  color:#303235!important;
+  background:transparent!important;
+}
+.app-shell.theme-light .work-board-item:last-child{
+  border-bottom:0!important;
+}
+.app-shell.theme-light .work-board-item strong{
+  color:#2e3032!important;
+}
+.app-shell.theme-light .work-board-item small,
+.app-shell.theme-light .work-board-item small b{
+  color:#707376!important;
+}
+.app-shell.theme-light .work-board-actions{
+  gap:2px!important;
+}
+.app-shell.theme-light .work-board-actions button,
+.app-shell.theme-light .work-board-actions .retreat{
+  width:26px!important;
+  height:28px!important;
+  border:0!important;
+  border-radius:7px!important;
+  color:#fff!important;
+  background:#666b6f!important;
+}
+.app-shell.theme-light .work-board-actions button:hover,
+.app-shell.theme-light .work-board-actions .retreat:hover{
+  color:#fff!important;
+  background:#4f5457!important;
+}
+
+/* ---------- Settings V2: compact professional page ---------- */
+.settings-page-v2{
+  width:min(1260px,100%)!important;
+  height:calc(100vh - 82px);
+  overflow:auto;
+  margin:0 auto!important;
+  padding:20px 24px 34px!important;
+  display:grid!important;
+  align-content:start!important;
+  gap:16px!important;
+}
+.settings-hero{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  padding:8px 2px 14px;
+  border-bottom:1px solid #36584d;
+}
+.settings-hero-copy{display:grid;gap:3px}
+.settings-hero-copy>span,
+.settings-section-heading span{
+  font-size:.68rem;
+  font-weight:800;
+}
+.settings-hero-copy h1{
+  margin:0;
+  font-size:1.7rem;
+  line-height:1.15;
+}
+.settings-hero-copy p{
+  margin:0;
+  font-size:.76rem;
+}
+.settings-back{
+  min-width:90px;
+  height:40px;
+  border:1px solid #4e6c61;
+  border-radius:9px;
+  color:#eef3f1;
+  background:#19342c;
+  cursor:pointer;
+  font-weight:800;
+}
+
+.settings-storage-panel{
+  padding:14px 16px;
+  border:1px solid #36584d;
+  border-radius:14px;
+  background:#10231e;
+}
+.settings-section-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding-bottom:10px;
+  border-bottom:1px solid #2f5046;
+}
+.settings-section-heading>div{display:grid;gap:2px}
+.settings-section-heading h2{
+  margin:0;
+  font-size:.95rem;
+}
+.settings-section-heading em,
+.settings-section-heading>b{
+  padding:5px 9px;
+  border:1px solid #506d63;
+  border-radius:999px;
+  font-size:.64rem;
+  font-style:normal;
+}
+.settings-storage-body{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:12px;
+  align-items:center;
+  margin-top:12px;
+}
+.settings-path-card{
+  min-width:0;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:5px 10px;
+  align-items:center;
+  padding:9px 11px;
+  border-inline-start:3px solid #66766f;
+}
+.settings-path-card small{font-size:.62rem}
+.settings-path-card b,
+.settings-path-card span{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:.68rem;
+}
+.settings-storage-actions{
+  display:flex;
+  gap:7px;
+}
+.settings-storage-actions button,
+.settings-save{
+  min-height:39px;
+  padding:0 13px;
+  border:1px solid #506d63;
+  border-radius:9px;
+  color:#e8efec;
+  background:#1b342d;
+  cursor:pointer;
+  font-weight:800;
+  font-size:.68rem;
+}
+.settings-storage-actions button:disabled{opacity:.5}
+.settings-alert,
+.settings-message{
+  margin:10px 0 0;
+  font-size:.68rem;
+}
+
+.settings-content-grid{
+  display:grid;
+  grid-template-columns:340px minmax(0,1fr);
+  gap:16px;
+  align-items:start;
+}
+.settings-editor-card,
+.settings-library-card{
+  min-width:0;
+  padding:15px;
+  border:1px solid #36584d;
+  border-radius:14px;
+  background:#10231e;
+}
+.settings-editor-card{
+  display:grid;
+  gap:12px;
+}
+.settings-editor-fields{
+  display:grid;
+  gap:10px;
+}
+.settings-editor-fields label,
+.settings-image-upload{
+  display:grid;
+  gap:6px;
+}
+.settings-editor-fields label>span,
+.settings-image-upload>span{
+  font-size:.67rem;
+  font-weight:800;
+}
+.settings-editor-fields input{
+  height:40px;
+  padding:0 10px;
+  border:1px solid #45675c;
+  border-radius:9px;
+  color:#eef3f0;
+  background:#0b1a16;
+}
+.settings-image-upload{
+  position:relative;
+  min-height:150px;
+  padding:10px;
+  border:1px dashed #547167;
+  border-radius:11px;
+  overflow:hidden;
+  cursor:pointer;
+}
+.settings-image-upload input{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  cursor:pointer;
+}
+.settings-image-upload img{
+  width:100%;
+  height:120px;
+  object-fit:contain;
+  border-radius:8px;
+  background:#fff;
+}
+.settings-image-upload>div{
+  height:100px;
+  display:grid;
+  place-content:center;
+  gap:4px;
+  text-align:center;
+}
+.settings-image-upload>div small{font-size:.62rem}
+.settings-save{
+  justify-self:start;
+  min-width:145px;
+}
+
+.settings-library-card{
+  display:grid;
+  gap:12px;
+}
+.settings-category-tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0;
+  border-bottom:1px solid #35574d;
+}
+.settings-category-tabs button{
+  min-height:36px;
+  padding:0 10px;
+  border:0;
+  border-bottom:2px solid transparent;
+  color:#aebcb6;
+  background:transparent;
+  cursor:pointer;
+  font-size:.66rem;
+  font-weight:700;
+}
+.settings-category-tabs button:hover{
+  color:#fff;
+}
+.settings-category-tabs button.selected{
+  color:#fff;
+  border-bottom-color:#8f9994;
+}
+.settings-option-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.settings-option-grid article{
+  min-width:0;
+  display:grid;
+  grid-template-columns:66px minmax(0,1fr) auto;
+  gap:9px;
+  align-items:center;
+  padding:8px;
+  border-bottom:1px solid #315348;
+}
+.settings-option-grid article img{
+  width:66px;
+  height:58px;
+  object-fit:contain;
+  border-radius:7px;
+  background:#fff;
+}
+.settings-option-grid article>div{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+.settings-option-grid article b{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:.7rem;
+}
+.settings-option-grid article small{font-size:.59rem}
+.settings-option-grid article>button{
+  border:0;
+  color:#ffb4a3;
+  background:transparent;
+  cursor:pointer;
+  font-size:.64rem;
+}
+.settings-empty-state{
+  grid-column:1/-1;
+  min-height:130px;
+  display:grid;
+  place-content:center;
+  gap:5px;
+  text-align:center;
+}
+.settings-empty-state span{font-size:.68rem}
+
+/* Settings V2 light mode */
+.app-shell.theme-light .settings-page-v2{
+  color:var(--lt-text)!important;
+}
+.app-shell.theme-light .settings-hero{
+  border-color:var(--lt-line)!important;
+}
+.app-shell.theme-light .settings-hero-copy h1,
+.app-shell.theme-light .settings-section-heading h2{
+  color:#2c2f31!important;
+}
+.app-shell.theme-light .settings-hero-copy p{
+  color:#717477!important;
+}
+.app-shell.theme-light .settings-back{
+  color:#fff!important;
+  border-color:#606568!important;
+  background:#606568!important;
+}
+.app-shell.theme-light .settings-storage-panel,
+.app-shell.theme-light .settings-editor-card,
+.app-shell.theme-light .settings-library-card{
+  color:#303235!important;
+  border-color:var(--lt-line)!important;
+  background:#f8f6f2!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .settings-section-heading{
+  border-color:var(--lt-line)!important;
+}
+.app-shell.theme-light .settings-section-heading em,
+.app-shell.theme-light .settings-section-heading>b{
+  color:#55595c!important;
+  border-color:#bbb7b0!important;
+  background:#ece9e3!important;
+}
+.app-shell.theme-light .settings-path-card{
+  border-inline-start-color:#6a6f72!important;
+}
+.app-shell.theme-light .settings-path-card small{
+  color:#777a7c!important;
+}
+.app-shell.theme-light .settings-path-card b,
+.app-shell.theme-light .settings-path-card span{
+  color:#343638!important;
+}
+.app-shell.theme-light .settings-storage-actions button,
+.app-shell.theme-light .settings-save{
+  color:#3b3e40!important;
+  border-color:#aaa69f!important;
+  background:#e9e6e0!important;
+}
+.app-shell.theme-light .settings-storage-actions .settings-primary,
+.app-shell.theme-light .settings-save{
+  color:#fff!important;
+  border-color:#5d6266!important;
+  background:#5d6266!important;
+}
+.app-shell.theme-light .settings-editor-fields label>span,
+.app-shell.theme-light .settings-image-upload>span{
+  color:#474a4c!important;
+}
+.app-shell.theme-light .settings-editor-fields input{
+  color:#292b2e!important;
+  border-color:#aaa8a3!important;
+  background:#fff!important;
+}
+.app-shell.theme-light .settings-image-upload{
+  border-color:#aaa69f!important;
+  background:#eeebe5!important;
+}
+.app-shell.theme-light .settings-image-upload>div b{
+  color:#424548!important;
+}
+.app-shell.theme-light .settings-image-upload>div small{
+  color:#7b7e80!important;
+}
+.app-shell.theme-light .settings-category-tabs{
+  border-color:var(--lt-line)!important;
+}
+.app-shell.theme-light .settings-category-tabs button{
+  color:#6c6f72!important;
+  border-bottom-color:transparent!important;
+  background:transparent!important;
+}
+.app-shell.theme-light .settings-category-tabs button:hover{
+  color:#303235!important;
+  background:#e9e6e0!important;
+}
+.app-shell.theme-light .settings-category-tabs button.selected{
+  color:#303235!important;
+  border-bottom-color:#62676a!important;
+  background:transparent!important;
+}
+.app-shell.theme-light .settings-option-grid article{
+  border-color:#d3cfc8!important;
+}
+.app-shell.theme-light .settings-option-grid article b{
+  color:#303235!important;
+}
+.app-shell.theme-light .settings-option-grid article small{
+  color:#76797b!important;
+}
+.app-shell.theme-light .settings-option-grid article>button{
+  color:#7b362c!important;
+}
+
+/* ---------- Final no-gold overrides for all light controls ---------- */
+.app-shell.theme-light .choice-switch button.selected,
+.app-shell.theme-light .collar-switch button.selected,
+.app-shell.theme-light .supply-unit-switch button.selected,
+.app-shell.theme-light .income-switch button.selected,
+.app-shell.theme-light .report-period-switch button.selected,
+.app-shell.theme-light .unit-switch button.selected,
+.app-shell.theme-light .finance-categories button.selected,
+.app-shell.theme-light .supplier-panel-tabs button.selected,
+.app-shell.theme-light .quick-description button.selected,
+.app-shell.theme-light .thobe-steps button.selected{
+  color:#fff!important;
+  border-color:#5d6266!important;
+  background:#5d6266!important;
+}
+.app-shell.theme-light .compact-order-head>div:first-child>span,
+.app-shell.theme-light .measure-column>header>span,
+.app-shell.theme-light .fabric-balance,
+.app-shell.theme-light .remaining span,
+.app-shell.theme-light .customer-next>span:not(.saved-mark),
+.app-shell.theme-light .history-head>div>span{
+  color:#656a6d!important;
+}
+.app-shell.theme-light .measure-column>header>span{
+  background:#dedbd5!important;
+}
+.app-shell.theme-light .fabric-search-results>button:hover,
+.app-shell.theme-light .customer-result-list>button:hover,
+.app-shell.theme-light .invoice-history-actions button:hover{
+  border-color:#99958f!important;
+  background:#e8e5df!important;
+}
+.app-shell.theme-light .save-exit,
+.app-shell.theme-light .business-form>button[type="submit"],
+.app-shell.theme-light .add-customer-action{
+  color:#fff!important;
+  border-color:#5d6266!important;
+  background:#5d6266!important;
+}
+.app-shell.theme-light .preview-tools button:first-of-type{
+  color:#fff!important;
+  border-color:#5d6266!important;
+  background:#5d6266!important;
+}
+
+/* Responsive settings */
+@media(max-width:1050px){
+  .settings-content-grid{grid-template-columns:1fr}
+  .settings-option-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .settings-page-v2{padding:14px 10px 28px!important}
+  .settings-storage-body{grid-template-columns:1fr}
+  .settings-storage-actions{flex-direction:column}
+  .settings-storage-actions button{width:100%}
+  .settings-option-grid{grid-template-columns:1fr}
+}
