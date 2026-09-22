@@ -2158,6 +2158,239 @@ button{font:inherit}
   color:#fff!important;
 }
 
+
+/* ---------- Legacy-color leak prevention inside V3 ---------- */
+.app-lock-loading,
+.management-empty,
+.customer-empty,
+.customer-history-placeholder,
+.empty-business,
+.finance-period-title,
+.report-result-title,
+.no-collar-note,
+.picker-empty{
+  color:var(--muted)!important;
+}
+
+.customer-edit-form,
+.customer-search-form,
+.customer-table-head,
+.history-summary,
+.history-row,
+.invoice-history-row,
+.invoice-history-number,
+.selected-customer-head,
+.module-search,
+.no-collar-note,
+.report-date-control,
+.picker-options>button,
+.fabric-search-results,
+.order-actions,
+.number-stepper{
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+  background:var(--surface)!important;
+  box-shadow:none!important;
+}
+
+.customer-edit-form label span,
+.customer-search-form label>span,
+.customer-result-data small,
+.customer-result-data em,
+.invoice-history-data p,
+.invoice-history-number small,
+.selected-customer-head>div>span,
+.selected-customer-head p,
+.history-filter,
+.history-list>p,
+.history-row small,
+.history-row span,
+.module-search span{
+  color:var(--muted)!important;
+}
+
+.customer-result-data em b,
+.customer-result-number,
+.invoice-history-data h3 span,
+.invoice-history-data p b,
+.invoice-history-number strong,
+.history-row b,
+.history-summary strong,
+.history-summary b{
+  color:var(--text)!important;
+}
+
+.customer-result-number{
+  border-color:var(--line)!important;
+}
+
+.customer-debt{
+  color:var(--danger)!important;
+  border-color:#c9aaa2!important;
+  background:var(--danger-soft)!important;
+}
+
+.customer-edit-form input,
+.customer-search-form input,
+.module-search input,
+.history-filter input{
+  color:var(--text)!important;
+  border-color:var(--line-strong)!important;
+  background:var(--surface)!important;
+}
+
+.customer-search-form button,
+.picker-empty button{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.customer-search-form button *,
+.picker-empty button *{
+  color:#fff!important;
+}
+
+.customer-table-head{
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.invoice-history-actions .duplicate-invoice{
+  color:var(--text)!important;
+  border-color:var(--line-strong)!important;
+  background:var(--surface-muted)!important;
+}
+
+.finance-metrics .expense,
+.finance-metrics .debt,
+.month-metrics .net,
+.report-money .net{
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+  background:var(--surface-muted)!important;
+}
+
+.fabric-search-results{
+  z-index:15!important;
+  border-color:var(--line-strong)!important;
+  background:var(--surface)!important;
+  box-shadow:0 14px 32px #00000022!important;
+}
+
+.fabric-search-results>button{
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+  background:transparent!important;
+}
+
+.fabric-search-results>button:hover{
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.fabric-search-results small{
+  color:var(--muted)!important;
+}
+
+.history-overlay,
+.picker-overlay,
+.preview-overlay{
+  background:#202225b8!important;
+  backdrop-filter:blur(6px)!important;
+}
+
+.history-summary{
+  background:var(--surface-muted)!important;
+}
+
+.history-row{
+  border-radius:12px!important;
+  background:var(--surface-soft)!important;
+}
+
+.no-collar-note{
+  border-style:dashed!important;
+  background:var(--surface-soft)!important;
+}
+
+.thobe-steps .copy-step,
+.repair-count-control button,
+.picker-empty button{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.thobe-steps .copy-step *,
+.repair-count-control button *,
+.picker-empty button *{
+  color:#fff!important;
+}
+
+.stepper-arrows button{
+  min-width:25px!important;
+  border-color:var(--line)!important;
+  color:#fff!important;
+  background:var(--accent)!important;
+}
+
+.stepper-arrows button:hover:not(:disabled){
+  color:#fff!important;
+  background:var(--accent-hover)!important;
+}
+
+.number-stepper{
+  overflow:hidden!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:8px!important;
+  background:var(--surface)!important;
+}
+
+.number-stepper input{
+  border:0!important;
+  background:transparent!important;
+}
+
+.picker-options>button{
+  border-radius:11px!important;
+  background:var(--surface-soft)!important;
+}
+
+.picker-options>button:hover{
+  border-color:var(--accent)!important;
+  background:var(--surface-muted)!important;
+}
+
+.remove-choice{
+  color:var(--danger)!important;
+  border-color:#c9aaa2!important;
+  background:var(--danger-soft)!important;
+}
+
+.bulk-stage-head{
+  border-color:var(--line)!important;
+}
+
+.report-date-control{
+  border-radius:10px!important;
+  background:var(--surface-soft)!important;
+}
+
+.repair-item-fields,
+.repair-note-field,
+.form-pair,
+.form-triple,
+.settings-editor-fields,
+.settings-storage-body,
+.customer-search-layout,
+.invoice-history-list,
+.history-list,
+.preview-sheets{
+  color:var(--text)!important;
+}
+
+
 /* ---------- Responsive ---------- */
 @media(max-width:1500px){
   .workspace{
