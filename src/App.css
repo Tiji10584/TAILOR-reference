@@ -2627,3 +2627,27 @@ button{font:inherit}
   background:#5d6266!important;
   border-color:#5d6266!important;
 }
+
+
+/* Dark-gray controls always use white foreground */
+.app-shell.theme-light .nav-icon,
+.app-shell.theme-light .nav-card.is-enabled .nav-icon,
+.app-shell.theme-light .metric-icon,
+.app-shell.theme-light .measure-column>header>span,
+.app-shell.theme-light .work-board-column header>b,
+.app-shell.theme-light .measure-unit-badge,
+.app-shell.theme-light .settings-section-heading em,
+.app-shell.theme-light .settings-section-heading>b{
+  color:#fff!important;
+  background:#5d6266!important;
+  border-color:#5d6266!important;
+}
+.app-shell.theme-light .nav-icon *,
+.app-shell.theme-light .metric-icon *,
+.app-shell.theme-light .measure-column>header>span *,
+.app-shell.theme-light .work-board-column header>b *,
+.app-shell.theme-light .measure-unit-badge *,
+.app-shell.theme-light .settings-section-heading em *,
+.app-shell.theme-light .settings-section-heading>b *{
+  color:#fff!important;
+}
