@@ -2149,6 +2149,376 @@ button{font:inherit}
   background:var(--accent)!important;
 }
 
+
+/* ---------- V4 audited secondary controls ---------- */
+
+/* Bulk transfer is one board, not many cards */
+.bulk-stage-grid{
+  display:grid!important;
+  grid-template-columns:repeat(5,minmax(180px,1fr))!important;
+  gap:0!important;
+  overflow:auto!important;
+  border:1px solid var(--line)!important;
+  border-radius:9px!important;
+  background:var(--surface)!important;
+}
+
+.bulk-stage-grid>section{
+  min-width:0!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-inline-start:1px solid var(--line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+
+.bulk-stage-grid>section:first-child{
+  border-inline-start:0!important;
+}
+
+.bulk-stage-head{
+  border-bottom:1px solid var(--line)!important;
+}
+
+.bulk-stage-grid h2{
+  margin:0!important;
+  padding:9px!important;
+  color:var(--text)!important;
+  border:0!important;
+  background:var(--surface-muted)!important;
+}
+
+.bulk-stage-grid h2 b{
+  color:#fff!important;
+  background:var(--accent)!important;
+}
+
+.bulk-stage-grid label{
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  color:var(--text)!important;
+  background:transparent!important;
+}
+
+/* messages/errors */
+.business-message,
+.customer-search-message{
+  color:var(--text)!important;
+  border:1px solid var(--line)!important;
+  border-radius:7px!important;
+  background:var(--surface-muted)!important;
+}
+
+.customer-error,
+.error{
+  color:var(--danger)!important;
+}
+
+.danger-button,
+.delete-customer{
+  color:var(--danger)!important;
+  border-color:#c9aaa2!important;
+  background:var(--danger-soft)!important;
+}
+
+/* customer result typography */
+.customer-result-data small,
+.customer-result-data em,
+.invoice-history-data p,
+.invoice-history-number small,
+.supplier-identity em{
+  color:var(--muted)!important;
+}
+
+.customer-result-data em b,
+.customer-result-number,
+.invoice-history-data h3 span,
+.invoice-history-data p b,
+.invoice-history-number strong{
+  color:var(--text)!important;
+}
+
+.customer-result-number{
+  border-color:var(--line)!important;
+}
+
+/* customer action groups */
+.selected-customer-actions button,
+.invoice-history-actions button,
+.selection-summary button,
+.debt-payment button{
+  color:var(--text)!important;
+  border:1px solid var(--line-strong)!important;
+  background:var(--surface)!important;
+}
+
+.selected-customer-actions button:first-child,
+.invoice-history-actions .duplicate-invoice{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.selected-customer-actions button:first-child *,
+.invoice-history-actions .duplicate-invoice *{
+  color:#fff!important;
+}
+
+/* Finance date/search controls become toolbar rows */
+.finance-date-tools,
+.extra-date-tools,
+.finance-search-date,
+.selection-summary,
+.debt-payment{
+  margin:8px 0!important;
+  padding:8px 0!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  color:var(--text)!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.finance-date-tools button,
+.extra-date-tools button{
+  min-height:36px!important;
+  padding:0 10px!important;
+  border:1px solid var(--line)!important;
+  border-radius:7px!important;
+  color:var(--text)!important;
+  background:var(--surface)!important;
+}
+
+.finance-date-tools button.selected,
+.extra-date-tools button.selected{
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+.finance-metrics .expense,
+.finance-metrics .debt,
+.month-metrics .net,
+.report-money .net{
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+  background:transparent!important;
+}
+
+/* history: one continuous list */
+.history-head{
+  border-color:var(--line)!important;
+}
+
+.history-head span,
+.history-filter,
+.history-list>p{
+  color:var(--muted)!important;
+}
+
+.history-head button{
+  color:var(--text)!important;
+  border:1px solid var(--line)!important;
+  background:var(--surface)!important;
+}
+
+.history-filter input{
+  color:var(--text)!important;
+  border-color:var(--line-strong)!important;
+  background:var(--surface)!important;
+}
+
+.history-list{
+  overflow:hidden!important;
+  border:1px solid var(--line)!important;
+  border-radius:9px!important;
+  background:var(--surface)!important;
+}
+
+.history-row{
+  margin:0!important;
+  padding:11px!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  color:var(--text)!important;
+  background:transparent!important;
+}
+
+.history-row:last-child{
+  border-bottom:0!important;
+}
+
+.history-row small,
+.history-row span{
+  color:var(--muted)!important;
+}
+
+.history-row b{
+  color:var(--text)!important;
+}
+
+.history-summary{
+  color:var(--text)!important;
+  border:0!important;
+  border-top:1px solid var(--line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+
+.history-summary strong,
+.history-summary b{
+  color:var(--text)!important;
+}
+
+/* movement list */
+.movement-list{
+  overflow:hidden!important;
+  border:1px solid var(--line)!important;
+  border-radius:9px!important;
+  background:var(--surface)!important;
+}
+
+.movement-list article{
+  padding:9px!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  color:var(--text)!important;
+  background:transparent!important;
+}
+
+.movement-list article:last-child{
+  border-bottom:0!important;
+}
+
+.movement-list small,
+.movement-list p,
+.movement-list span{
+  color:var(--muted)!important;
+}
+
+/* supplier balances form one strip */
+.supplier-account-values{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:0!important;
+  overflow:hidden!important;
+  border:1px solid var(--line)!important;
+  border-radius:8px!important;
+  background:var(--surface)!important;
+}
+
+.supplier-account-values>span,
+.supplier-account-values>strong{
+  padding:8px 10px!important;
+  border:0!important;
+  border-inline-start:1px solid var(--line)!important;
+  border-radius:0!important;
+  color:var(--muted)!important;
+  background:transparent!important;
+}
+
+.supplier-account-values>:first-child{
+  border-inline-start:0!important;
+}
+
+.supplier-account-values b{
+  color:var(--text)!important;
+}
+
+.supplier-account-values .has-balance{
+  color:var(--danger)!important;
+  background:var(--danger-soft)!important;
+}
+
+/* calculations/results as inline information rows */
+.supply-calculation,
+.restock-result{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  justify-content:space-between!important;
+  gap:8px!important;
+  padding:8px 0!important;
+  border:0!important;
+  border-top:1px solid var(--line)!important;
+  border-radius:0!important;
+  color:var(--muted)!important;
+  background:transparent!important;
+}
+
+.supply-calculation b,
+.restock-result b{
+  color:var(--text)!important;
+}
+
+/* pickers and preview toolbars */
+.preview-tools{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin-bottom:10px!important;
+  padding:7px 0!important;
+  color:var(--text)!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+
+.preview-tools button{
+  padding:7px 11px!important;
+  border:1px solid var(--line)!important;
+  border-radius:7px!important;
+  color:var(--text)!important;
+  background:var(--surface)!important;
+}
+
+.preview-tools button:first-of-type{
+  margin-right:auto!important;
+  color:#fff!important;
+  border-color:var(--accent)!important;
+  background:var(--accent)!important;
+}
+
+/* stepper / count */
+.thobe-count-field .number-stepper{
+  min-width:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 24px!important;
+  overflow:hidden!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:6px!important;
+  background:var(--surface)!important;
+}
+
+.thobe-count-field .number-stepper input{
+  height:30px!important;
+  border:0!important;
+  background:transparent!important;
+}
+
+.stepper-arrows button{
+  min-width:24px!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  color:#fff!important;
+  background:var(--accent)!important;
+}
+
+.stepper-arrows button:last-child{
+  border-bottom:0!important;
+}
+
+.work-board-actions .retreat{
+  color:#fff!important;
+  background:var(--accent)!important;
+}
+
+
 /* ---------- Responsive ---------- */
 @media(max-width:1500px){
   .workspace{
