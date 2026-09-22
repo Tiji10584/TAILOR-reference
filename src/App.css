@@ -630,3 +630,113 @@ button{font:inherit}
   .report-cards article,.report-money article{aspect-ratio:auto;min-height:118px}
   .repair-item-fields{grid-template-columns:1fr}
 }
+
+
+/* Final neutral coverage for every internal light-mode section */
+.app-shell.theme-light .customer-workspace,
+.app-shell.theme-light .customer-next,
+.app-shell.theme-light .customer-form,
+.app-shell.theme-light .customer-search-head,
+.app-shell.theme-light .customer-table-head,
+.app-shell.theme-light .customer-result-list,
+.app-shell.theme-light .selected-customer-head,
+.app-shell.theme-light .customer-edit-form,
+.app-shell.theme-light .invoice-history-row,
+.app-shell.theme-light .customer-history-placeholder,
+.app-shell.theme-light .storage-card,
+.app-shell.theme-light .storage-path,
+.app-shell.theme-light .supplier-account-values,
+.app-shell.theme-light .supplier-panel-tabs,
+.app-shell.theme-light .finance-date-tools,
+.app-shell.theme-light .finance-table,
+.app-shell.theme-light .extra-date-tools,
+.app-shell.theme-light .history-dialog,
+.app-shell.theme-light .history-filter,
+.app-shell.theme-light .history-summary,
+.app-shell.theme-light .history-row,
+.app-shell.theme-light .feature-disabled,
+.app-shell.theme-light .campaign-history,
+.app-shell.theme-light .debt-payment,
+.app-shell.theme-light .quick-description,
+.app-shell.theme-light .compact-photo,
+.app-shell.theme-light .thobe-steps,
+.app-shell.theme-light .order-actions,
+.app-shell.theme-light .finance-categories,
+.app-shell.theme-light .finance-search-date{
+  color:#303133!important;
+  border-color:#c9c4bc!important;
+  background:#f7f5f1!important;
+  box-shadow:none!important;
+}
+.app-shell.theme-light .customer-result-list>button,
+.app-shell.theme-light .invoice-history-actions button,
+.app-shell.theme-light .selected-customer-actions button,
+.app-shell.theme-light .storage-actions button,
+.app-shell.theme-light .supplier-panel-tabs button,
+.app-shell.theme-light .finance-categories button,
+.app-shell.theme-light .finance-date-tools button,
+.app-shell.theme-light .extra-date-tools button,
+.app-shell.theme-light .history-head button,
+.app-shell.theme-light .thobe-steps button,
+.app-shell.theme-light .order-actions button,
+.app-shell.theme-light .quick-description button,
+.app-shell.theme-light .repair-count-control button,
+.app-shell.theme-light .bulk-stage-head>button{
+  color:#44474a!important;
+  border-color:#aaa59d!important;
+  background:#ebe8e2!important;
+}
+.app-shell.theme-light .customer-result-list>button:hover,
+.app-shell.theme-light .customer-result-list>button.selected,
+.app-shell.theme-light .supplier-panel-tabs button.selected,
+.app-shell.theme-light .finance-categories button.selected,
+.app-shell.theme-light .thobe-steps button.selected,
+.app-shell.theme-light .quick-description button.selected{
+  color:#fff!important;
+  border-color:#626568!important;
+  background:#626568!important;
+}
+.app-shell.theme-light .selected-customer-actions button:first-child,
+.app-shell.theme-light .storage-actions .storage-copy-button,
+.app-shell.theme-light .invoice-history-actions .duplicate-invoice{
+  color:#fff!important;
+  border-color:#626568!important;
+  background:#626568!important;
+}
+.app-shell.theme-light .customer-debt,
+.app-shell.theme-light .supplier-account-values .has-balance,
+.app-shell.theme-light .finance-metrics .debt{
+  color:#514b42!important;
+  border-color:#bbb3a5!important;
+  background:#e9e3d9!important;
+}
+.app-shell.theme-light .finance-metrics .expense{
+  color:#4f4642!important;
+  border-color:#c7b8b0!important;
+  background:#ede4df!important;
+}
+.app-shell.theme-light .finance-metrics .net,
+.app-shell.theme-light .month-metrics .net,
+.app-shell.theme-light .report-money .net{
+  color:#343638!important;
+  border-color:#aba8a2!important;
+  background:#e2e0dc!important;
+}
+.app-shell.theme-light .history-overlay{background:#37373755!important}
+.app-shell.theme-light .history-head{border-color:#c7c2ba!important}
+.app-shell.theme-light .history-head span,
+.app-shell.theme-light .history-row small,
+.app-shell.theme-light .customer-result-data small,
+.app-shell.theme-light .invoice-history-number small,
+.app-shell.theme-light .storage-path small{color:#77736d!important}
+.app-shell.theme-light .history-row strong,
+.app-shell.theme-light .history-row b,
+.app-shell.theme-light .customer-result-number,
+.app-shell.theme-light .invoice-history-number strong,
+.app-shell.theme-light .storage-path b,
+.app-shell.theme-light .storage-path span{color:#303133!important}
+.app-shell.theme-light .business-message{
+  color:#3f4244!important;
+  border-color:#c3beb6!important;
+  background:#e9e6e0!important;
+}
