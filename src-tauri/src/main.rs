@@ -121,7 +121,7 @@ struct SavedInvoice{
 #[serde(rename_all="camelCase")]
 struct ExtraTransactionPayload{
  transaction_type:String,customer_name:String,customer_phone:String,fabric_id:Option<i64>,
- quantity:i64,meters:f64,description:String,total_price:f64,payment_method:String,transaction_date:Option<String>
+ quantity:i64,meters:f64,description:String,total_price:f64,payment_method:String
 }
 
 #[derive(Serialize)]
@@ -910,13 +910,12 @@ fn financial_overview(app:AppHandle)->Result<FinancialOverview,String>{
 }
 
 #[tauri::command]
-fn add_financial_entry(app:AppHandle,entry_type:String,description:String,amount:f64,payment_method:String,entry_date:String)->Result<FinancialEntry,String>{
+fn add_financial_entry(app:AppHandle,entry_type:String,description:String,amount:f64,payment_method:String)->Result<FinancialEntry,String>{
  if entry_type!="مصروف"&&entry_type!="دخل يدوي"{return Err("نوع الحركة المالية غير صحيح".into())}
  if !amount.is_finite()||amount<=0.0{return Err("أدخل مبلغًا أكبر من صفر".into())}
  if description.trim().is_empty(){return Err("اكتب وصف الحركة المالية".into())}
  let conn=db(&app)?;
- let created_at=if entry_date.trim().is_empty(){None}else{Some(format!("{} 12:00:00",entry_date.trim()))};
- conn.execute("INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at) VALUES(?1,?2,?3,?4,COALESCE(?5,datetime('now','localtime')))",params![entry_type,description.trim(),amount,payment_method,created_at]).map_err(|e|e.to_string())?;
+ conn.execute("INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at) VALUES(?1,?2,?3,?4,datetime('now','localtime'))",params![entry_type,description.trim(),amount,payment_method]).map_err(|e|e.to_string())?;
  let id=conn.last_insert_rowid();
  conn.query_row("SELECT id,entry_type,description,amount,payment_method,created_at FROM financial_entries WHERE id=?1",[id],|row|Ok(FinancialEntry{id:row.get(0)?,entry_type:row.get(1)?,description:row.get(2)?,amount:row.get(3)?,payment_method:row.get(4)?,created_at:row.get(5)?})).map_err(|e|e.to_string())
 }
@@ -1061,8 +1060,8 @@ fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result
  }
  transaction.execute(
   "INSERT INTO extra_transactions(transaction_type,customer_name,customer_phone,fabric_id,quantity,meters,description,total_price,payment_method,created_at)
-   VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,COALESCE(?10,datetime('now','localtime')))",
-  params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method,payload.transaction_date.filter(|value|!value.trim().is_empty()).map(|value|format!("{} 12:00:00",value.trim()))]
+   VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,datetime('now','localtime'))",
+  params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  if transaction_type=="بيع قماش"{
