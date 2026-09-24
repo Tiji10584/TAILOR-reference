@@ -3384,6 +3384,516 @@ button{font:inherit}
   }
 }
 
+
+/* ---------- V4 INTERACTION SYSTEM ---------- */
+.app-shell.theme-light,
+.app-shell.theme-dark{
+  --motion-fast:140ms;
+  --motion-normal:220ms;
+  --motion-slow:320ms;
+  --ease-ui:cubic-bezier(.2,.75,.25,1);
+}
+
+/* Page entry: makes navigation feel like one real desktop application */
+.app-shell> :where(
+  .workspace,
+  .management-page,
+  .business-page,
+  .customer-search-page,
+  .customer-workspace,
+  .order-page,
+  .settings-page,
+  .distribution-page,
+  .inventory-page,
+  .module-page
+){
+  animation:v4-page-enter var(--motion-normal) var(--ease-ui) both;
+}
+
+@keyframes v4-page-enter{
+  from{opacity:0;transform:translateY(5px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* Universal interactive behavior */
+.app-shell :where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  .nav-card,
+  .metric-card,
+  .work-board-item,
+  .customer-result-list>button,
+  .invoice-history-row,
+  .inventory-card,
+  .repair-garment-item,
+  .report-cards article,
+  .report-money article,
+  .supplier-payment-history button,
+  .movement-list article,
+  .notes-list article
+){
+  transition:
+    background-color var(--motion-fast) var(--ease-ui),
+    border-color var(--motion-fast) var(--ease-ui),
+    color var(--motion-fast) var(--ease-ui),
+    box-shadow var(--motion-fast) var(--ease-ui),
+    transform var(--motion-fast) var(--ease-ui),
+    opacity var(--motion-fast) var(--ease-ui);
+}
+
+.app-shell button:not(:disabled),
+.app-shell a,
+.app-shell .nav-card,
+.app-shell .customer-result-list>button,
+.app-shell .invoice-history-row,
+.app-shell .inventory-card,
+.app-shell .supplier-payment-history button{
+  cursor:pointer!important;
+}
+
+.app-shell button:disabled{
+  cursor:not-allowed!important;
+  opacity:.55!important;
+}
+
+/* Keyboard / accessibility focus */
+.app-shell :where(button,a,input,select,textarea):focus-visible{
+  outline:2px solid var(--accent)!important;
+  outline-offset:2px!important;
+}
+
+/* Buttons: hover, press and release feedback */
+.app-shell button:not(:disabled):hover{
+  transform:translateY(-1px);
+}
+
+.app-shell button:not(:disabled):active{
+  transform:translateY(0) scale(.975);
+  transition-duration:70ms;
+}
+
+/* Topbar interactions */
+.top-actions>button:hover,
+.theme-switch button:hover{
+  box-shadow:0 5px 14px #00000012!important;
+}
+
+.theme-switch button:not(.selected):hover{
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.brand>span{
+  transition:transform var(--motion-normal) var(--ease-ui),box-shadow var(--motion-normal) var(--ease-ui);
+}
+
+.brand:hover>span{
+  transform:rotate(-3deg) scale(1.045);
+  box-shadow:0 7px 18px #00000014!important;
+}
+
+/* Main navigation */
+.nav-card{
+  position:relative!important;
+  overflow:hidden!important;
+}
+
+.nav-card::after{
+  content:"";
+  position:absolute;
+  inset-block:10px;
+  inset-inline-start:0;
+  width:3px;
+  border-radius:99px;
+  background:var(--accent);
+  opacity:0;
+  transform:scaleY(.35);
+  transition:opacity var(--motion-fast) var(--ease-ui),transform var(--motion-fast) var(--ease-ui);
+}
+
+.nav-card:hover::after{
+  opacity:1;
+  transform:scaleY(1);
+}
+
+.nav-card:hover{
+  padding-inline-start:9px!important;
+}
+
+.nav-icon{
+  transition:transform var(--motion-normal) var(--ease-ui),background-color var(--motion-fast) var(--ease-ui)!important;
+}
+
+.nav-card:hover .nav-icon{
+  transform:scale(1.07);
+}
+
+.nav-card:active .nav-icon{
+  transform:scale(.94);
+}
+
+/* Dashboard metrics */
+.metric-card{
+  position:relative!important;
+}
+
+.metric-card:hover{
+  background:var(--surface-muted)!important;
+}
+
+.metric-card:hover .metric-icon{
+  transform:translateY(-2px) scale(1.05);
+}
+
+.metric-icon{
+  transition:transform var(--motion-normal) var(--ease-ui)!important;
+}
+
+.metric-card strong{
+  transition:transform var(--motion-normal) var(--ease-ui),color var(--motion-fast) var(--ease-ui);
+}
+
+.metric-card:hover strong{
+  transform:translateY(-1px);
+}
+
+/* Work board */
+.work-board-column{
+  transition:background-color var(--motion-fast) var(--ease-ui);
+}
+
+.work-board-column:hover{
+  background:color-mix(in srgb,var(--surface) 92%,var(--accent) 8%)!important;
+}
+
+.work-board-item:hover{
+  padding-inline:6px!important;
+  background:var(--surface-muted)!important;
+}
+
+.work-board-item:active{
+  transform:scale(.992);
+}
+
+.work-board-actions button:hover{
+  background:var(--accent-hover)!important;
+  box-shadow:0 4px 10px #00000018!important;
+}
+
+.work-board-search input{
+  transition:color var(--motion-fast) var(--ease-ui),background-color var(--motion-fast) var(--ease-ui);
+}
+
+/* Forms and inputs */
+.app-shell :where(input,select,textarea):hover:not(:disabled){
+  border-color:var(--accent)!important;
+}
+
+.app-shell :where(input,select,textarea):focus{
+  transform:translateY(-1px);
+}
+
+.app-shell :where(input,select,textarea):active{
+  transform:none;
+}
+
+.customer-fields label,
+.compact-field,
+.compact-select,
+.repair-item-fields label,
+.repair-note-field,
+.business-form label,
+.settings-editor-fields label{
+  transition:color var(--motion-fast) var(--ease-ui);
+}
+
+.customer-fields label:focus-within span,
+.compact-field:focus-within>span,
+.compact-select:focus-within>span,
+.repair-item-fields label:focus-within>span,
+.repair-note-field:focus-within>span,
+.business-form label:focus-within>span,
+.settings-editor-fields label:focus-within>span{
+  color:var(--accent)!important;
+}
+
+/* Tabs and segmented controls */
+.app-shell :where(
+  .choice-switch button,
+  .collar-switch button,
+  .unit-switch button,
+  .income-switch button,
+  .report-period-switch button,
+  .finance-categories button,
+  .supplier-panel-tabs button,
+  .supply-unit-switch button,
+  .quick-description button,
+  .thobe-steps button
+):not(.selected):hover{
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.app-shell :where(
+  .choice-switch button.selected,
+  .collar-switch button.selected,
+  .unit-switch button.selected,
+  .income-switch button.selected,
+  .report-period-switch button.selected,
+  .finance-categories button.selected,
+  .supplier-panel-tabs button.selected,
+  .supply-unit-switch button.selected,
+  .quick-description button.selected
+){
+  box-shadow:inset 0 -2px 0 #ffffff55!important;
+}
+
+/* Measurement workspace */
+.measure-column{
+  transition:background-color var(--motion-normal) var(--ease-ui);
+}
+
+.measure-column:hover{
+  background:color-mix(in srgb,var(--surface) 94%,var(--accent) 6%)!important;
+}
+
+.measure-input-wrap,
+.named-dual-measure,
+.dual-measure{
+  transition:border-color var(--motion-fast) var(--ease-ui),box-shadow var(--motion-fast) var(--ease-ui);
+}
+
+.measure-input-wrap:focus-within,
+.named-dual-measure:focus-within,
+.dual-measure:focus-within{
+  border-color:var(--accent)!important;
+  box-shadow:var(--focus)!important;
+}
+
+.measure-unit-badge{
+  transition:background-color var(--motion-fast) var(--ease-ui),transform var(--motion-fast) var(--ease-ui);
+}
+
+.measure-input-wrap:focus-within .measure-unit-badge,
+.named-dual-measure:focus-within .measure-unit-badge,
+.dual-measure:focus-within .measure-unit-badge{
+  background:var(--accent-hover)!important;
+}
+
+.compact-photo{
+  transition:background-color var(--motion-fast) var(--ease-ui),transform var(--motion-fast) var(--ease-ui);
+}
+
+.compact-photo:hover{
+  transform:translateY(-1px);
+}
+
+/* Customer search */
+.customer-result-list>button:hover{
+  transform:translateX(-2px);
+}
+
+.customer-result-list>button.selected{
+  transform:none!important;
+}
+
+.customer-result-list>button:active{
+  transform:translateX(-1px) scale(.992);
+}
+
+.customer-result-number{
+  transition:background-color var(--motion-fast) var(--ease-ui),color var(--motion-fast) var(--ease-ui);
+}
+
+.invoice-history-row:hover{
+  background:var(--surface-muted)!important;
+}
+
+.invoice-history-row:hover .invoice-history-number{
+  transform:translateY(-1px);
+}
+
+.invoice-history-number{
+  transition:transform var(--motion-fast) var(--ease-ui);
+}
+
+/* Finance and tables */
+.finance-table>article,
+.finance-entry-list article,
+.debt-list article{
+  transition:background-color var(--motion-fast) var(--ease-ui),transform var(--motion-fast) var(--ease-ui);
+}
+
+.finance-table>article:hover,
+.finance-entry-list article:hover,
+.debt-list article:hover{
+  background:var(--surface-muted)!important;
+}
+
+.finance-table>article:hover{
+  transform:translateX(-1px);
+}
+
+.finance-categories button:not(.selected):hover{
+  border-color:var(--accent)!important;
+}
+
+/* Reports */
+.report-cards article,
+.report-money article{
+  position:relative;
+}
+
+.report-cards article:hover,
+.report-money article:hover{
+  background:var(--surface-muted)!important;
+  transform:translateY(-2px);
+}
+
+.report-cards article b,
+.report-money article b{
+  transition:transform var(--motion-normal) var(--ease-ui);
+}
+
+.report-cards article:hover b,
+.report-money article:hover b{
+  transform:scale(1.035);
+}
+
+/* Suppliers and inventory */
+.supplier-account-list>article{
+  transition:background-color var(--motion-fast) var(--ease-ui);
+}
+
+.supplier-account-list>article:hover{
+  background:var(--surface-muted)!important;
+}
+
+.inventory-card:hover{
+  transform:translateY(-2px)!important;
+  box-shadow:0 8px 18px #00000014!important;
+}
+
+.inventory-card:active{
+  transform:translateY(0) scale(.99)!important;
+}
+
+/* Settings */
+.settings-option-grid article{
+  transition:background-color var(--motion-fast) var(--ease-ui),transform var(--motion-fast) var(--ease-ui);
+}
+
+.settings-option-grid article:hover{
+  background:var(--surface-muted)!important;
+}
+
+.settings-category-tabs button:not(.selected):hover{
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.settings-image-upload{
+  transition:border-color var(--motion-fast) var(--ease-ui),background-color var(--motion-fast) var(--ease-ui),transform var(--motion-fast) var(--ease-ui);
+}
+
+.settings-image-upload:hover{
+  border-color:var(--accent)!important;
+  background:var(--surface-muted)!important;
+  transform:translateY(-1px);
+}
+
+/* Repair / extra income */
+.repair-garment-item{
+  transition:border-color var(--motion-fast) var(--ease-ui),background-color var(--motion-fast) var(--ease-ui);
+}
+
+.repair-garment-item:hover{
+  border-color:var(--accent)!important;
+  background:var(--surface-soft)!important;
+}
+
+/* History and movements */
+.history-row:hover,
+.movement-list article:hover,
+.notes-list article:hover{
+  background:var(--surface-muted)!important;
+}
+
+/* Modals */
+.preview-overlay,
+.picker-overlay,
+.history-overlay{
+  animation:v4-overlay-in var(--motion-fast) ease-out both;
+}
+
+.preview-dialog,
+.picker-dialog,
+.history-dialog,
+.movement-dialog{
+  animation:v4-dialog-in var(--motion-normal) var(--ease-ui) both;
+}
+
+@keyframes v4-overlay-in{
+  from{opacity:0}
+  to{opacity:1}
+}
+
+@keyframes v4-dialog-in{
+  from{opacity:0;transform:translateY(8px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Scrollbars feel integrated with the current theme */
+.app-shell *{
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-strong) transparent;
+}
+
+.app-shell *::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+}
+
+.app-shell *::-webkit-scrollbar-thumb{
+  border:2px solid transparent;
+  border-radius:99px;
+  background:var(--line-strong);
+  background-clip:padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-thumb:hover{
+  background:var(--accent);
+  background-clip:padding-box;
+}
+
+/* Printing must never animate */
+@media print{
+  *{
+    animation:none!important;
+    transition:none!important;
+    transform:none!important;
+  }
+}
+
+/* Respect OS reduced-motion preference */
+@media(prefers-reduced-motion:reduce){
+  .app-shell *,
+  .preview-overlay,
+  .picker-overlay,
+  .history-overlay,
+  .preview-dialog,
+  .picker-dialog,
+  .history-dialog,
+  .movement-dialog{
+    animation:none!important;
+    transition:none!important;
+    scroll-behavior:auto!important;
+  }
+}
+
 /* ---------- Responsive ---------- */
 @media(max-width:1500px){
   .workspace{
