@@ -2618,7 +2618,20 @@ button{font:inherit}
   .report-money article,
   .supplier-payment-history button,
   .movement-list article,
-  .notes-list article
+  .notes-list article,
+  .order-summary-strip>div,
+  .order-summary-strip>label,
+  .measure-column,
+  .compact-finance>label,
+  .compact-remaining,
+  .settings-editor-card,
+  .settings-library-card,
+  .finance-metrics article,
+  .month-metrics article,
+  .report-cards article,
+  .report-money article,
+  .repair-garments-card,
+  .supplier-account-list>article
 ){
   transition:
     background-color var(--motion-fast) var(--ease-ui),
@@ -2924,6 +2937,43 @@ button{font:inherit}
 
 .finance-categories button:not(.selected):hover{
   border-color:var(--accent)!important;
+}
+
+
+/* Card interactions across the application */
+.order-summary-strip>div:hover,
+.order-summary-strip>label:hover,
+.compact-finance>label:hover,
+.compact-remaining:hover,
+.finance-metrics article:hover,
+.month-metrics article:hover{
+  border-color:var(--accent)!important;
+  box-shadow:0 8px 18px #00000010!important;
+  transform:translateY(-2px);
+}
+
+.measure-column:hover,
+.settings-editor-card:hover,
+.settings-library-card:hover,
+.repair-garments-card:hover{
+  border-color:var(--accent)!important;
+  box-shadow:0 10px 24px #00000012!important;
+}
+
+.supplier-account-list>article:hover{
+  background:var(--surface-muted)!important;
+  transform:translateX(-1px);
+}
+
+.compact-head-actions>button:hover,
+.compact-order-actions button:hover{
+  border-color:var(--accent)!important;
+  box-shadow:0 5px 12px #00000010!important;
+}
+
+.compact-head-actions>button:active,
+.compact-order-actions button:active{
+  transform:scale(.97);
 }
 
 /* Reports */
