@@ -44,6 +44,12 @@ struct SupplierPayment{id:i64,supplier_id:i64,supplier_name:String,amount:f64,pa
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
+struct SupplierLedgerEntry{
+ source_type:String,source_id:i64,supplier_id:i64,entry_type:String,title:String,details:String,amount:f64,created_at:String
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 struct FabricItem{
  id:i64,supplier_id:Option<i64>,supplier_name:String,name:String,color:String,
  stock_meters:f64,purchase_price:f64,sale_price:f64,created_at:String
@@ -360,6 +366,27 @@ fn db(app:&AppHandle)->Result<Connection,String>{
     AND NOT EXISTS(
       SELECT 1 FROM financial_entries f
       WHERE f.reference_type='دخل إضافي' AND f.reference_id=e.id
+    );
+  UPDATE financial_entries
+  SET reference_type='دفعة مورد',
+      reference_id=(
+       SELECT p.id
+       FROM supplier_payments p
+       JOIN suppliers s ON s.id=p.supplier_id
+       WHERE p.amount=financial_entries.amount
+         AND p.created_at=financial_entries.created_at
+         AND financial_entries.description='دفعة للمورد ' || s.name
+       ORDER BY p.id DESC LIMIT 1
+      )
+  WHERE entry_type='دفعة مورد'
+    AND COALESCE(reference_type,'')=''
+    AND EXISTS(
+      SELECT 1
+      FROM supplier_payments p
+      JOIN suppliers s ON s.id=p.supplier_id
+      WHERE p.amount=financial_entries.amount
+        AND p.created_at=financial_entries.created_at
+        AND financial_entries.description='دفعة للمورد ' || s.name
     );
  ").map_err(|e|e.to_string())?;
  Ok(conn)
@@ -723,12 +750,82 @@ fn add_supplier_payment(app:AppHandle,supplier_id:i64,amount:f64,payment_method:
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  transaction.execute(
-  "INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at) VALUES('دفعة مورد',?1,?2,?3,datetime('now','localtime'))",
-  params![format!("دفعة للمورد {}",supplier_name),amount,payment_method.trim()]
+  "INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at,reference_type,reference_id)
+   VALUES('دفعة مورد',?1,?2,?3,datetime('now','localtime'),'دفعة مورد',?4)",
+  params![format!("دفعة للمورد {}",supplier_name),amount,payment_method.trim(),id]
  ).map_err(|e|e.to_string())?;
  let created_at:String=transaction.query_row("SELECT created_at FROM supplier_payments WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
  Ok(SupplierPayment{id,supplier_id,supplier_name,amount,payment_method,notes,created_at})
+}
+
+#[tauri::command]
+fn list_supplier_ledger(app:AppHandle,supplier_id:i64)->Result<Vec<SupplierLedgerEntry>,String>{
+ let conn=db(&app)?;
+ let exists:i64=conn.query_row("SELECT COUNT(*) FROM suppliers WHERE id=?1",[supplier_id],|row|row.get(0)).map_err(|e|e.to_string())?;
+ if exists==0{return Err("المورد غير موجود".into())}
+ let mut statement=conn.prepare(
+  "SELECT source_type,source_id,supplier_id,entry_type,title,details,amount,created_at
+   FROM (
+    SELECT 'supply' AS source_type,m.id AS source_id,f.supplier_id AS supplier_id,
+           'توريد قماش' AS entry_type,
+           f.name || CASE WHEN trim(f.color)<>'' THEN ' — ' || f.color ELSE '' END AS title,
+           m.movement_type || ' · ' || printf('%.2f متر',m.meters) ||
+             CASE WHEN trim(m.notes)<>'' THEN ' · ' || m.notes ELSE '' END AS details,
+           m.total_cost AS amount,m.created_at AS created_at
+    FROM fabric_movements m
+    JOIN fabrics f ON f.id=m.fabric_id
+    WHERE f.supplier_id=?1 AND m.meters>0 AND m.total_cost>0.0001
+    UNION ALL
+    SELECT 'payment',p.id,p.supplier_id,'تسديد للمورد','سند تسديد',
+           p.payment_method || CASE WHEN trim(p.notes)<>'' THEN ' · ' || p.notes ELSE '' END,
+           p.amount,p.created_at
+    FROM supplier_payments p
+    WHERE p.supplier_id=?1
+   )
+   ORDER BY datetime(created_at) DESC,source_id DESC"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map([supplier_id],|row|Ok(SupplierLedgerEntry{
+  source_type:row.get(0)?,source_id:row.get(1)?,supplier_id:row.get(2)?,entry_type:row.get(3)?,
+  title:row.get(4)?,details:row.get(5)?,amount:row.get(6)?,created_at:row.get(7)?,
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn update_supplier_ledger_date(app:AppHandle,source_type:String,source_id:i64,entry_date:String)->Result<(),String>{
+ let date_text=entry_date.trim();
+ let conn=db(&app)?;
+ let valid:Option<String>=conn.query_row("SELECT date(?1)",[date_text],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let valid_date=valid.ok_or_else(||"التاريخ غير صحيح".to_string())?;
+ match source_type.trim(){
+  "supply"=>{
+   let changed=conn.execute(
+    "UPDATE fabric_movements
+     SET created_at=?1 || ' ' || COALESCE(NULLIF(time(created_at),''),'12:00:00')
+     WHERE id=?2",
+    params![valid_date,source_id]
+   ).map_err(|e|e.to_string())?;
+   if changed==0{return Err("حركة التوريد غير موجودة".into())}
+  },
+  "payment"=>{
+   let changed=conn.execute(
+    "UPDATE supplier_payments
+     SET created_at=?1 || ' ' || COALESCE(NULLIF(time(created_at),''),'12:00:00')
+     WHERE id=?2",
+    params![valid_date,source_id]
+   ).map_err(|e|e.to_string())?;
+   if changed==0{return Err("دفعة المورد غير موجودة".into())}
+   conn.execute(
+    "UPDATE financial_entries
+     SET created_at=(SELECT created_at FROM supplier_payments WHERE id=?1)
+     WHERE reference_type='دفعة مورد' AND reference_id=?1",
+    [source_id]
+   ).map_err(|e|e.to_string())?;
+  },
+  _=>return Err("نوع حركة المورد غير صحيح".into()),
+ }
+ Ok(())
 }
 
 #[tauri::command]
@@ -1057,9 +1154,9 @@ fn list_extra_transactions(app:AppHandle)->Result<Vec<ExtraTransaction>,String>{
 #[tauri::command]
 fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result<ExtraTransaction,String>{
  let transaction_type=payload.transaction_type.trim();
- if transaction_type!="تصليح"&&transaction_type!="بيع قماش"{return Err("نوع العملية غير صحيح".into())}
+ if transaction_type!="تصليح"&&transaction_type!="بيع قماش"&&transaction_type!="بيع جاهز"{return Err("نوع العملية غير صحيح".into())}
  if payload.customer_name.trim().is_empty(){return Err("اسم الزبون مطلوب".into())}
- if transaction_type=="تصليح"&&payload.quantity<1{return Err("عدد الثياب المطلوب تصليحها غير صحيح".into())}
+ if (transaction_type=="تصليح"||transaction_type=="بيع جاهز")&&payload.quantity<1{return Err("الكمية غير صحيحة".into())}
  if !payload.total_price.is_finite()||payload.total_price<0.0{return Err("السعر غير صحيح".into())}
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
@@ -1222,7 +1319,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
