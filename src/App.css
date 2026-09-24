@@ -3108,6 +3108,282 @@ button{font:inherit}
   color:var(--text)!important;
 }
 
+
+/* ---------- V4 final correction: customer names + monochrome printing ---------- */
+
+/* Customer search results: always light, readable, and consistent */
+.customer-results-panel{
+  color:var(--text)!important;
+  background:var(--surface)!important;
+}
+
+.customer-search-form{
+  padding:12px!important;
+  border-bottom:1px solid var(--line)!important;
+  background:var(--surface)!important;
+}
+
+.customer-search-form label{
+  display:grid!important;
+  gap:6px!important;
+}
+
+.customer-search-form label>span{
+  color:var(--text)!important;
+  font-weight:800!important;
+}
+
+.customer-search-form label>div{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 72px!important;
+  gap:7px!important;
+}
+
+.customer-search-form input{
+  height:39px!important;
+  padding:0 10px!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:8px!important;
+  color:var(--text)!important;
+  background:#fff!important;
+}
+
+.customer-search-form button{
+  height:39px!important;
+  border:1px solid var(--accent)!important;
+  border-radius:8px!important;
+  color:#fff!important;
+  background:var(--accent)!important;
+}
+
+.customer-table-head{
+  min-height:38px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 84px!important;
+  align-items:center!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.customer-table-head>b{
+  padding:0 10px!important;
+  color:var(--text)!important;
+}
+
+.customer-result-list{
+  overflow-y:auto!important;
+  color:var(--text)!important;
+  background:#fff!important;
+}
+
+.customer-result-list>button{
+  width:100%!important;
+  min-height:70px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 84px!important;
+  align-items:stretch!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  text-align:right!important;
+  color:var(--text)!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+
+.customer-result-list>button:nth-of-type(even){
+  background:#faf8f3!important;
+}
+
+.customer-result-list>button:hover{
+  color:var(--text)!important;
+  background:var(--surface-muted)!important;
+}
+
+.customer-result-list>button.selected{
+  color:var(--text)!important;
+  background:var(--accent-soft)!important;
+  box-shadow:inset -3px 0 0 var(--accent)!important;
+}
+
+.customer-result-data{
+  min-width:0!important;
+  display:grid!important;
+  align-content:center!important;
+  gap:3px!important;
+  padding:9px 11px!important;
+  color:var(--text)!important;
+}
+
+.customer-result-data strong{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:center!important;
+  gap:6px!important;
+  color:var(--text)!important;
+  font-size:.78rem!important;
+}
+
+.customer-result-data small,
+.customer-result-data em{
+  color:var(--muted)!important;
+  font-style:normal!important;
+  font-size:.64rem!important;
+}
+
+.customer-result-data em b{
+  color:var(--text)!important;
+}
+
+.customer-result-number{
+  display:grid!important;
+  place-items:center!important;
+  padding:8px!important;
+  border:0!important;
+  border-inline-start:1px solid var(--line)!important;
+  color:var(--text)!important;
+  background:transparent!important;
+  font-size:.9rem!important;
+  font-weight:800!important;
+}
+
+.customer-result-list>button.selected .customer-result-number{
+  color:#fff!important;
+  background:var(--accent)!important;
+}
+
+.customer-debt{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:3px!important;
+  padding:2px 6px!important;
+  border:1px solid #c9aaa2!important;
+  border-radius:999px!important;
+  color:var(--danger)!important;
+  background:var(--danger-soft)!important;
+  font-size:.58rem!important;
+}
+
+.customer-debt b{
+  color:var(--danger)!important;
+}
+
+/* Preview itself must match the final paper: pure white + black/gray */
+.preview-dialog .measurement-paper,
+.preview-dialog .receipt-paper,
+.preview-dialog .a5-financial-sheet,
+.preview-dialog .financial-entry-sheet,
+.preview-dialog .supplier-payment-sheet,
+.preview-dialog .report-print-sheet,
+.preview-dialog .extra-receipt,
+.preview-dialog .customer-receipt,
+.preview-dialog .laundry-receipt{
+  color:#000!important;
+  background:#fff!important;
+}
+
+.preview-dialog .measurement-paper *,
+.preview-dialog .receipt-paper *,
+.preview-dialog .a5-financial-sheet *,
+.preview-dialog .financial-entry-sheet *,
+.preview-dialog .supplier-payment-sheet *,
+.preview-dialog .report-print-sheet *,
+.preview-dialog .extra-receipt *,
+.preview-dialog .customer-receipt *,
+.preview-dialog .laundry-receipt *{
+  color:#000!important;
+  border-color:#777!important;
+  text-shadow:none!important;
+  box-shadow:none!important;
+}
+
+.preview-dialog .measurement-paper :where(header,.paper-customer,.paper-work-card,.paper-work-card>h3,.paper-feature-photo,.paper-values,.paper-double-photo),
+.preview-dialog .a5-financial-sheet :where(header,section,article,div),
+.preview-dialog .financial-entry-sheet :where(header,section,article,div),
+.preview-dialog .supplier-payment-sheet :where(header,section,article,div),
+.preview-dialog .report-print-sheet :where(header,section,article,div){
+  background:#fff!important;
+}
+
+.preview-dialog .measurement-paper .paper-work-card>h3{
+  color:#000!important;
+  border-bottom:1px solid #000!important;
+  background:#fff!important;
+}
+
+.preview-dialog .measurement-paper .paper-customer{
+  color:#000!important;
+  background:#fff!important;
+}
+
+.preview-dialog .measurement-paper img,
+.preview-dialog .receipt-paper img,
+.preview-dialog .a5-financial-sheet img,
+.preview-dialog .financial-entry-sheet img,
+.preview-dialog .supplier-payment-sheet img,
+.preview-dialog .report-print-sheet img,
+.preview-dialog .extra-receipt img,
+.preview-dialog .customer-receipt img,
+.preview-dialog .laundry-receipt img{
+  filter:grayscale(1)!important;
+}
+
+/* Actual printed output: black and white only, independent of app theme */
+@media print{
+  .measurement-paper,
+  .receipt-paper,
+  .a5-financial-sheet,
+  .financial-entry-sheet,
+  .supplier-payment-sheet,
+  .report-print-sheet,
+  .extra-receipt,
+  .customer-receipt,
+  .laundry-receipt{
+    color:#000!important;
+    background:#fff!important;
+    print-color-adjust:economy!important;
+    -webkit-print-color-adjust:economy!important;
+  }
+
+  .measurement-paper *,
+  .receipt-paper *,
+  .a5-financial-sheet *,
+  .financial-entry-sheet *,
+  .supplier-payment-sheet *,
+  .report-print-sheet *,
+  .extra-receipt *,
+  .customer-receipt *,
+  .laundry-receipt *{
+    color:#000!important;
+    border-color:#777!important;
+    background-color:#fff!important;
+    text-shadow:none!important;
+    box-shadow:none!important;
+  }
+
+  .measurement-paper .paper-work-card>h3{
+    color:#000!important;
+    border:1px solid #000!important;
+    background:#fff!important;
+  }
+
+  .measurement-paper img,
+  .receipt-paper img,
+  .a5-financial-sheet img,
+  .financial-entry-sheet img,
+  .supplier-payment-sheet img,
+  .report-print-sheet img,
+  .extra-receipt img,
+  .customer-receipt img,
+  .laundry-receipt img{
+    filter:grayscale(1)!important;
+  }
+}
+
 /* ---------- Responsive ---------- */
 @media(max-width:1500px){
   .workspace{
