@@ -139,7 +139,7 @@ export default function App(){
   const [financeReceipt,setFinanceReceipt]=useState<FinancialEntry|null>(null);
   const [reportDate,setReportDate]=useState(()=>dateInputValue(new Date()));const [reportPeriod,setReportPeriod]=useState<"يومي"|"شهري"|"سنوي">("يومي");const [dailyReportData,setDailyReportData]=useState<DailyReport|null>(null);const [reportMessage,setReportMessage]=useState("");
   const [appSettings,setAppSettings]=useState<AppSettings>({shopName:"",ownerName:"",financePinSet:false,appPinSet:false,theme:"dark",initialized:false,largeCutPrice:30,smallCutPrice:25});const [settingsShopName,setSettingsShopName]=useState("");const [settingsOwnerName,setSettingsOwnerName]=useState("");const [settingsFinancePin,setSettingsFinancePin]=useState("");const [settingsAppPin,setSettingsAppPin]=useState("");const [settingsLargeCutPrice,setSettingsLargeCutPrice]=useState("30");const [settingsSmallCutPrice,setSettingsSmallCutPrice]=useState("25");const [cutPriceMessage,setCutPriceMessage]=useState("");const [appPinAttempt,setAppPinAttempt]=useState("");const [appPinError,setAppPinError]=useState("");const [appAccessChecked,setAppAccessChecked]=useState(false);const [appUnlocked,setAppUnlocked]=useState(false);const [accessMessage,setAccessMessage]=useState("");
-  const total=numericValue(totalPrice),paid=numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
+  const total=numericValue(totalPrice),paid=numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const currentCutPrice=thobeSize==="كبير"?appSettings.largeCutPrice:appSettings.smallCutPrice;const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
 
   async function load(){try{setError("");const [dashboard,current,board]=await Promise.all([invoke<Dashboard>("dashboard_summary"),invoke<CurrentSession>("current_session"),invoke<WorkBoardItem[]>("work_board")]);setData(dashboard);setSession(current);setWorkItems(board)}catch{setError("تعذر قراءة بيانات المحل المحلية.")}}
   async function loadDesignOptions(){try{setDesignOptions(await invoke<DesignOption[]>("list_design_options"))}catch{setSettingsError("تعذر قراءة مكتبة الأشكال.")}}
@@ -391,7 +391,14 @@ export default function App(){
     </section>}
     {view==="access"&&<section className="business-page module-page" dir="rtl"><header className="business-head"><div><span>إدارة المحل</span><h1>الصلاحيات وبيانات المحل</h1><p>غيّر اسم المحل والمالك، واحمِ دخول التطبيق وقسم المعاملات المالية برمزين منفصلين.</p></div><button type="button" onClick={()=>setView("dashboard")}>رجوع للرئيسية</button></header><form className="business-form access-form" onSubmit={event=>void saveAccessSettings(event)}><label><span>اسم المحل</span><input value={settingsShopName} onChange={event=>setSettingsShopName(event.target.value)} placeholder="أناقة التميز"/></label><label><span>اسم المالك</span><input value={settingsOwnerName} onChange={event=>setSettingsOwnerName(event.target.value)} placeholder="اسم صاحب المحل"/></label><label><span>{appSettings.appPinSet?"رمز دخول جديد — اتركه فارغًا للإبقاء على الحالي":"رمز دخول التطبيق"}</span><input className="numeric" type="password" inputMode="numeric" value={settingsAppPin} onChange={event=>setSettingsAppPin(latinDigits(event.target.value).replace(/\D/g,"").slice(0,8))} placeholder="4 إلى 8 أرقام"/></label><label><span>{appSettings.financePinSet?"رمز مالي جديد — اتركه فارغًا للإبقاء على الحالي":"رمز قسم المعاملات المالية"}</span><input className="numeric" type="password" inputMode="numeric" value={settingsFinancePin} onChange={event=>setSettingsFinancePin(latinDigits(event.target.value).replace(/\D/g,"").slice(0,8))} placeholder="4 إلى 8 أرقام"/></label><button type="submit">حفظ الإعدادات</button>{appSettings.appPinSet&&<button className="danger-button" type="button" onClick={()=>void clearAppPin()}>إلغاء رمز دخول التطبيق</button>}{appSettings.financePinSet&&<button className="danger-button" type="button" onClick={()=>void clearFinancePin()}>إلغاء رمز المالية</button>}{accessMessage&&<p className="business-message">{accessMessage}</p>}</form></section>}
     {view==="order"&&currentCustomer&&<section className="order-page compact-order" dir="rtl" onKeyDown={moveBetweenNumberFields}>
-      <div className="compact-order-head"><div><span>{invoice?"فاتورة محفوظة":"فاتورة جديدة"}</span><h1>مقاسات الثوب</h1></div><div className="compact-head-actions"><div className="unit-switch"><button type="button" className={unit==="سم"?"selected":""} disabled={orderLocked} onClick={()=>setUnit("سم")}>سم</button><button type="button" className={unit==="إنش"?"selected":""} disabled={orderLocked} onClick={()=>setUnit("إنش")}>إنش</button></div><button type="button" onClick={()=>setView("settings")}>إدارة الصور</button><button className="save-exit" type="button" disabled={savingInvoice||(!orderLocked&&fabricSaveBlocked)} onClick={()=>void saveAndExit()}>{orderLocked?"تم الحفظ — خروج":"حفظ وخروج"}</button><button className="discard-exit" type="button" onClick={exitWithoutSave}>خروج بدون حفظ</button></div></div>
+      <div className="compact-order-head"><div><span>{invoice?"فاتورة محفوظة":"فاتورة جديدة"}</span><h1>مقاسات الثوب</h1></div><div className="compact-head-actions"><button type="button" onClick={()=>setView("settings")}>الإعدادات والصور</button><button className="save-exit" type="button" disabled={savingInvoice||(!orderLocked&&fabricSaveBlocked)} onClick={()=>void saveAndExit()}>{orderLocked?"تم الحفظ — خروج":"حفظ وخروج"}</button><button className="discard-exit" type="button" onClick={exitWithoutSave}>خروج بدون حفظ</button></div></div>
+
+      <section className="measurement-setup-bar">
+        <div className="measurement-setup-card unit-card"><span>وحدة القياس</span><div className="unit-switch"><button type="button" className={unit==="إنش"?"selected":""} disabled={orderLocked} onClick={()=>changeMeasurementUnit("إنش")}>إنش</button><button type="button" className={unit==="سم"?"selected":""} disabled={orderLocked} onClick={()=>changeMeasurementUnit("سم")}>سم</button></div><small>اختيار الوحدة لهذا المقاس</small></div>
+        <div className="measurement-setup-card size-card"><span>حجم الثوب</span><div className="size-switch"><button type="button" className={thobeSize==="كبير"?"selected":""} disabled={orderLocked} onClick={()=>chooseThobeSize("كبير")}>كبير</button><button type="button" className={thobeSize==="صغير"?"selected":""} disabled={orderLocked} onClick={()=>chooseThobeSize("صغير")}>صغير</button></div><div className="size-mode-row"><small>{sizeOverride?"اختيار يدوي":"تلقائي: 50 إنش / 127 سم"}</small>{sizeOverride&&!orderLocked&&<button type="button" onClick={restoreAutomaticSize}>رجوع للتلقائي</button>}</div></div>
+        <label className="measurement-setup-card worker-card"><span>عامل القص</span><input list="worker-name-list" disabled={orderLocked} value={workerName} onChange={event=>setWorkerName(event.target.value)} placeholder="اكتب اسم العامل"/><datalist id="worker-name-list">{workerNames.map(name=><option key={name} value={name}/>)}</datalist><small>يُحفظ العامل مع هذا الثوب فقط</small></label>
+        <div className="measurement-setup-card cut-price-card"><span>أجر القص</span><strong className="numeric">{numberFormat.format(currentCutPrice)} <small>ر.س</small></strong><small>{thobeSize==="كبير"?"سعر الثوب الكبير":"سعر الثوب الصغير"} · من الإعدادات</small></div>
+      </section>
 
       <section className="order-summary-strip">
         <div><span>اسم العميل</span><b>{currentCustomer.name}</b></div>
@@ -425,37 +432,60 @@ export default function App(){
     </section>}
     {view==="settings"&&<section className="settings-page settings-page-v2" dir="rtl">
       <header className="settings-hero">
-        <div className="settings-hero-copy"><span>إدارة التطبيق</span><h1>الإعدادات</h1><p>إدارة مكان حفظ البيانات ومكتبة أشكال الثوب من صفحة واحدة مرتبة وواضحة.</p></div>
+        <div className="settings-hero-copy"><span>إدارة التطبيق</span><h1>الإعدادات</h1><p>إعدادات المحل وأجور القص والتخزين ومكتبة أشكال الثوب، مرتبة في أقسام مستقلة.</p></div>
         <button className="settings-back" type="button" onClick={()=>setView(currentCustomer?"order":"dashboard")}>رجوع</button>
       </header>
 
-      <section className="settings-storage-panel">
-        <div className="settings-section-heading"><div><span>التخزين</span><h2>قاعدة بيانات المحل</h2></div><em>{storage?.isCustom?"مكان مخصص":"المكان الافتراضي"}</em></div>
-        <div className="settings-storage-body">
-          <div className="settings-path-card"><small>المجلد المستخدم</small><b dir="ltr">{storage?.folder||"جارٍ قراءة المكان…"}</b><small>ملف البيانات</small><span dir="ltr">{storage?.databasePath||"—"}</span></div>
-          <div className="settings-storage-actions"><button className="settings-primary" type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("copy")}>{storageBusy?"جارٍ تغيير المكان…":"تغيير مكان الحفظ"}</button><button type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("use")}>ربط مجلد بيانات موجود</button></div>
-        </div>
-        {currentCustomer&&<p className="settings-alert">اخرج من فاتورة العميل أولًا قبل تغيير مكان قاعدة البيانات.</p>}{storageMessage&&<p className="settings-message">{storageMessage}</p>}
-      </section>
+      <section className="settings-overview-grid">
+        <article className="settings-control-card settings-account-card">
+          <div className="settings-card-icon">01</div>
+          <div><span>المحل والصلاحيات</span><h2>{appSettings.shopName||"بيانات المحل"}</h2><p>المالك: <b>{appSettings.ownerName||"—"}</b></p><small>إدارة اسم المحل ورمز دخول التطبيق ورمز المالية.</small></div>
+          <button type="button" onClick={()=>setView("access")}>فتح الصلاحيات</button>
+        </article>
 
-      <div className="settings-content-grid">
-        <form className="settings-editor-card" onSubmit={event=>void addDesignOption(event)}>
-          <div className="settings-section-heading"><div><span>إضافة شكل</span><h2>نوع جديد</h2></div></div>
-          <div className="settings-editor-fields">
-            <label><span>القسم</span><input list="category-list" value={settingsCategory} onChange={event=>setSettingsCategory(event.target.value)}/><datalist id="category-list">{categories.map(category=><option key={category} value={category}/>)}</datalist></label>
-            <label><span>اسم النوع</span><input value={optionName} onChange={event=>setOptionName(event.target.value)} placeholder="مثال: قلاب ملكي"/></label>
+        <form className="settings-control-card settings-cut-price-card" onSubmit={event=>void saveCutPrices(event)}>
+          <div className="settings-card-icon">02</div>
+          <div className="settings-card-heading"><span>أجور القص</span><h2>سعر العامل حسب حجم الثوب</h2><p>الحجم يتحدد تلقائيًا عند 50 إنش، ويمكن تغييره يدويًا من صفحة المقاسات.</p></div>
+          <div className="cut-price-fields">
+            <label><span>الثوب الكبير</span><div><input className="numeric" inputMode="decimal" value={settingsLargeCutPrice} onChange={event=>setSettingsLargeCutPrice(latinDigits(event.target.value))}/><b>ر.س</b></div><small>الافتراضي 30</small></label>
+            <label><span>الثوب الصغير</span><div><input className="numeric" inputMode="decimal" value={settingsSmallCutPrice} onChange={event=>setSettingsSmallCutPrice(latinDigits(event.target.value))}/><b>ر.س</b></div><small>الافتراضي 25</small></label>
           </div>
-          <label className="settings-image-upload"><span>صورة النوع</span><input type="file" accept="image/*" onChange={event=>void selectImage(event)}/>{optionImage?<img src={optionImage} alt="معاينة الصورة"/>:<div><b>اختر صورة من الكمبيوتر</b><small>PNG أو JPG</small></div>}</label>
-          {settingsError&&<p className="settings-alert">{settingsError}</p>}
-          <button className="settings-save" type="submit">حفظ النوع والصورة</button>
+          {cutPriceMessage&&<p className="settings-message">{cutPriceMessage}</p>}
+          <button className="settings-primary" type="submit">حفظ أسعار القص</button>
         </form>
 
-        <section className="settings-library-card">
-          <div className="settings-section-heading"><div><span>المكتبة</span><h2>أشكال الثوب</h2></div><b>{designOptions.filter(option=>option.category===settingsCategory).length} عناصر</b></div>
-          <div className="settings-category-tabs">{categories.map(category=><button className={settingsCategory===category?"selected":""} type="button" key={category} onClick={()=>setSettingsCategory(category)}>{category}</button>)}</div>
-          <div className="settings-option-grid">{designOptions.filter(option=>option.category===settingsCategory).length===0&&<div className="settings-empty-state"><b>لا توجد أنواع في هذا القسم</b><span>أضف أول نوع من النموذج المجاور.</span></div>}{designOptions.filter(option=>option.category===settingsCategory).map(option=><article key={option.id}><img src={option.imageData} alt={option.name}/><div><b>{option.name}</b><small>{option.category}</small></div><button type="button" onClick={()=>void deleteDesignOption(option.id)}>حذف</button></article>)}</div>
+        <section className="settings-control-card settings-storage-panel">
+          <div className="settings-card-icon">03</div>
+          <div className="settings-section-heading"><div><span>التخزين</span><h2>قاعدة بيانات المحل</h2></div><em>{storage?.isCustom?"مكان مخصص":"المكان الافتراضي"}</em></div>
+          <div className="settings-storage-body">
+            <div className="settings-path-card"><small>المجلد المستخدم</small><b dir="ltr">{storage?.folder||"جارٍ قراءة المكان…"}</b><small>ملف البيانات</small><span dir="ltr">{storage?.databasePath||"—"}</span></div>
+            <div className="settings-storage-actions"><button className="settings-primary" type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("copy")}>{storageBusy?"جارٍ تغيير المكان…":"تغيير مكان الحفظ"}</button><button type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("use")}>ربط مجلد بيانات موجود</button></div>
+          </div>
+          {currentCustomer&&<p className="settings-alert">اخرج من فاتورة العميل أولًا قبل تغيير مكان قاعدة البيانات.</p>}{storageMessage&&<p className="settings-message">{storageMessage}</p>}
         </section>
-      </div>
+      </section>
+
+      <section className="settings-library-section">
+        <div className="settings-library-heading"><div><span>04 · مكتبة الأشكال</span><h2>إدارة صور وأنواع الثوب</h2><p>أضف الأنواع والصور ثم استخدمها مباشرة من صفحة المقاسات.</p></div><b>{designOptions.length} عنصر</b></div>
+        <div className="settings-content-grid">
+          <form className="settings-editor-card" onSubmit={event=>void addDesignOption(event)}>
+            <div className="settings-section-heading"><div><span>إضافة شكل</span><h2>نوع جديد</h2></div></div>
+            <div className="settings-editor-fields">
+              <label><span>القسم</span><input list="category-list" value={settingsCategory} onChange={event=>setSettingsCategory(event.target.value)}/><datalist id="category-list">{categories.map(category=><option key={category} value={category}/>)}</datalist></label>
+              <label><span>اسم النوع</span><input value={optionName} onChange={event=>setOptionName(event.target.value)} placeholder="مثال: قلاب ملكي"/></label>
+            </div>
+            <label className="settings-image-upload"><span>صورة النوع</span><input type="file" accept="image/*" onChange={event=>void selectImage(event)}/>{optionImage?<img src={optionImage} alt="معاينة الصورة"/>:<div><b>اختر صورة من الكمبيوتر</b><small>PNG أو JPG</small></div>}</label>
+            {settingsError&&<p className="settings-alert">{settingsError}</p>}
+            <button className="settings-save" type="submit">حفظ النوع والصورة</button>
+          </form>
+
+          <section className="settings-library-card">
+            <div className="settings-section-heading"><div><span>المكتبة</span><h2>أشكال الثوب</h2></div><b>{designOptions.filter(option=>option.category===settingsCategory).length} عناصر</b></div>
+            <div className="settings-category-tabs">{categories.map(category=><button className={settingsCategory===category?"selected":""} type="button" key={category} onClick={()=>setSettingsCategory(category)}>{category}</button>)}</div>
+            <div className="settings-option-grid">{designOptions.filter(option=>option.category===settingsCategory).length===0&&<div className="settings-empty-state"><b>لا توجد أنواع في هذا القسم</b><span>أضف أول نوع من النموذج المجاور.</span></div>}{designOptions.filter(option=>option.category===settingsCategory).map(option=><article key={option.id}><img src={option.imageData} alt={option.name}/><div><b>{option.name}</b><small>{option.category}</small></div><button type="button" onClick={()=>void deleteDesignOption(option.id)}>حذف</button></article>)}</div>
+          </section>
+        </div>
+      </section>
     </section>}
     {pickerCategory&&<div className="picker-overlay" onMouseDown={()=>setPickerCategory(null)}><section className="picker-dialog" dir="rtl" onMouseDown={event=>event.stopPropagation()}><header><div><span>اختيار النوع</span><h2>{pickerCategory}</h2></div><button type="button" onClick={()=>setPickerCategory(null)}>×</button></header><div className="picker-options">{designOptions.filter(option=>option.category===pickerCategory).length===0&&<div className="picker-empty"><p>لا توجد صور مضافة لهذا القسم.</p><button type="button" onClick={()=>{setSettingsCategory(pickerCategory);setPickerCategory(null);setView("settings")}}>إضافتها من الإعدادات</button></div>}{designOptions.filter(option=>option.category===pickerCategory).map(option=><button type="button" key={option.id} onClick={()=>{setSelectedDesigns(current=>({...current,[pickerCategory]:option}));if(pickerCategory==="نوع الثوب"&&(thobeTypes as readonly string[]).includes(option.name))setThobeType(option.name);setPickerCategory(null)}}><img src={option.imageData} alt={option.name}/><b>{option.name}</b></button>)}</div>{selectedDesigns[pickerCategory]&&<button className="remove-choice" type="button" onClick={()=>{setSelectedDesigns(current=>({...current,[pickerCategory]:undefined}));setPickerCategory(null)}}>إلغاء اختيار هذا القسم</button>}</section></div>}
     {movementFabric&&<div className="picker-overlay" onMouseDown={()=>setMovementFabric(null)}><section className="movement-dialog" dir="rtl" onMouseDown={event=>event.stopPropagation()}><header><div><span>سجل المخزون</span><h2>{fabrics.find(item=>item.id===movementFabric)?.name} — {fabrics.find(item=>item.id===movementFabric)?.color}</h2></div><button type="button" onClick={()=>setMovementFabric(null)}>×</button></header><form className="restock-form restock-expanded" onSubmit={event=>void restockSelectedFabric(event)}><div className="supply-unit-switch"><button type="button" className={restockUnit==="متر"?"selected":""} onClick={()=>setRestockUnit("متر")}>توريد بالمتر</button><button type="button" className={restockUnit==="كرتون"?"selected":""} onClick={()=>setRestockUnit("كرتون")}>توريد بالكرتون</button></div>{restockUnit==="متر"?<><label><span>إضافة أمتار</span><input className="numeric" value={restockMeters} onChange={event=>setRestockMeters(latinDigits(event.target.value))}/></label><label><span>سعر شراء المتر</span><input className="numeric" value={restockPrice} onChange={event=>setRestockPrice(latinDigits(event.target.value))}/></label></>:<><label><span>عدد الكراتين</span><input className="numeric" value={restockCartons} onChange={event=>setRestockCartons(latinDigits(event.target.value))}/></label><label><span>متر/كرتون</span><input className="numeric" value={restockMetersPerCarton} onChange={event=>setRestockMetersPerCarton(latinDigits(event.target.value))}/></label><label><span>سعر الكرتون كامل</span><input className="numeric" value={restockPrice} onChange={event=>setRestockPrice(latinDigits(event.target.value))}/></label></>}<label><span>ملاحظة</span><input value={restockNotes} onChange={event=>setRestockNotes(event.target.value)} placeholder="رقم فاتورة المورد"/></label><div className="restock-result"><span><b className="numeric">{numberFormat.format(restockTotalMeters)}</b> متر</span><span>تكلفة المتر <b className="numeric">{numberFormat.format(restockMeterCost)}</b> ر.س</span></div><button type="submit">إضافة للمخزون</button></form><div className="movement-list">{fabricMovements.length===0&&<p>لا توجد حركات.</p>}{fabricMovements.map(item=><article key={item.id}><div><strong>{item.movementType}</strong><small className="numeric">{dateFormat.format(databaseDate(item.createdAt))}</small></div><b className={`numeric ${item.meters<0?"out":"in"}`}>{item.meters>0?"+":""}{numberFormat.format(item.meters)} متر</b><span>الرصيد: <b className="numeric">{numberFormat.format(item.balanceAfter)}</b> متر</span><p>{item.entryUnit==="كرتون"&&item.cartonCount>0?<><b className="numeric">{numberFormat.format(item.cartonCount)}</b> كرتون × <b className="numeric">{numberFormat.format(item.metersPerCarton)}</b> م · سعر الكرتون <b className="numeric">{numberFormat.format(item.metersPerCarton*item.unitCost)}</b> ر.س · </>:null}{item.notes}</p></article>)}</div></section></div>}
