@@ -327,6 +327,11 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    created_at TEXT NOT NULL,
    FOREIGN KEY(supplier_id) REFERENCES suppliers(id)
   );
+  CREATE TABLE IF NOT EXISTS workers(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   name TEXT NOT NULL UNIQUE,
+   created_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS worker_cut_entries(
    id INTEGER PRIMARY KEY AUTOINCREMENT,
    invoice_id INTEGER NOT NULL,
@@ -369,6 +374,11 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  UPDATE invoices SET invoice_number='__invoice_' || id;
  UPDATE invoices SET invoice_number=CAST(id AS TEXT);
   UPDATE design_options SET category='الكبك' WHERE category='الكباك';
+  INSERT OR IGNORE INTO workers(name,created_at)
+  SELECT trim(worker_name),MIN(created_at)
+  FROM worker_cut_entries
+  WHERE trim(worker_name)<>''
+  GROUP BY trim(worker_name);
   INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at)
   SELECT 'دفعة فاتورة',i.id,'دفعة أولية للفاتورة ' || i.invoice_number,CAST(NULLIF(i.paid_amount,'') AS REAL),i.payment_method,i.created_at
   FROM invoices i
@@ -1123,9 +1133,27 @@ fn save_cut_prices(app:AppHandle,large_cut_price:f64,small_cut_price:f64)->Resul
 #[tauri::command]
 fn list_worker_names(app:AppHandle)->Result<Vec<String>,String>{
  let conn=db(&app)?;
- let mut statement=conn.prepare("SELECT worker_name FROM worker_cut_entries WHERE trim(worker_name)<>'' GROUP BY worker_name ORDER BY MAX(id) DESC,worker_name COLLATE NOCASE").map_err(|e|e.to_string())?;
+ let mut statement=conn.prepare("SELECT name FROM workers ORDER BY id ASC").map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn add_worker(app:AppHandle,name:String)->Result<Vec<String>,String>{
+ let normalized=name.trim();
+ if normalized.is_empty(){return Err("اكتب اسم العامل".into())}
+ let conn=db(&app)?;
+ conn.execute("INSERT OR IGNORE INTO workers(name,created_at) VALUES(?1,datetime('now','localtime'))",[normalized]).map_err(|e|e.to_string())?;
+ list_worker_names(app)
+}
+
+#[tauri::command]
+fn delete_worker(app:AppHandle,name:String)->Result<Vec<String>,String>{
+ let normalized=name.trim();
+ if normalized.is_empty(){return Err("اسم العامل غير صحيح".into())}
+ let conn=db(&app)?;
+ conn.execute("DELETE FROM workers WHERE name=?1",[normalized]).map_err(|e|e.to_string())?;
+ list_worker_names(app)
 }
 
 #[tauri::command]
@@ -1373,7 +1401,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,add_worker,delete_worker,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
