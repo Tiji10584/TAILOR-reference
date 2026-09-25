@@ -105,6 +105,13 @@ struct FabricUsagePayload{fabric_id:i64,thobe_index:i64,meters:f64}
 #[serde(rename_all="camelCase")]
 struct WorkerCutPayload{thobe_index:i64,worker_name:String,thobe_size:String,amount:f64}
 
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkerLedgerEntry{
+ id:i64,invoice_id:i64,invoice_number:String,customer_name:String,thobe_index:i64,
+ thobe_size:String,amount:f64,created_at:String
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
 struct InvoicePayload{
@@ -1156,6 +1163,27 @@ fn delete_worker(app:AppHandle,name:String)->Result<Vec<String>,String>{
  list_worker_names(app)
 }
 
+
+#[tauri::command]
+fn worker_ledger(app:AppHandle,name:String)->Result<Vec<WorkerLedgerEntry>,String>{
+ let worker=name.trim();
+ if worker.is_empty(){return Err("اختر العامل".into())}
+ let conn=db(&app)?;
+ let mut statement=conn.prepare(
+  "SELECT w.id,w.invoice_id,i.invoice_number,COALESCE(c.name,''),w.thobe_index,w.thobe_size,w.amount,w.created_at
+   FROM worker_cut_entries w
+   JOIN invoices i ON i.id=w.invoice_id
+   LEFT JOIN customers c ON c.id=i.customer_id
+   WHERE w.worker_name=?1
+   ORDER BY datetime(w.created_at) DESC,w.id DESC"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map([worker],|row|Ok(WorkerLedgerEntry{
+  id:row.get(0)?,invoice_id:row.get(1)?,invoice_number:row.get(2)?,customer_name:row.get(3)?,
+  thobe_index:row.get(4)?,thobe_size:row.get(5)?,amount:row.get(6)?,created_at:row.get(7)?,
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
 #[tauri::command]
 fn clear_finance_pin(app:AppHandle)->Result<AppSettings,String>{
  let conn=db(&app)?;conn.execute("DELETE FROM app_settings WHERE setting_key='finance_pin'",[]).map_err(|e|e.to_string())?;get_app_settings(app)
@@ -1401,7 +1429,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,add_worker,delete_worker,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,add_worker,delete_worker,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
