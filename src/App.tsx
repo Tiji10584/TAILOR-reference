@@ -138,8 +138,8 @@ export default function App(){
   const [financeResetMode,setFinanceResetMode]=useState(false);const [financeResetPin,setFinanceResetPin]=useState("");const [financeResetConfirm,setFinanceResetConfirm]=useState("");const [financeFilterDate,setFinanceFilterDate]=useState("");
   const [financeReceipt,setFinanceReceipt]=useState<FinancialEntry|null>(null);
   const [reportDate,setReportDate]=useState(()=>dateInputValue(new Date()));const [reportPeriod,setReportPeriod]=useState<"يومي"|"شهري"|"سنوي">("يومي");const [dailyReportData,setDailyReportData]=useState<DailyReport|null>(null);const [reportMessage,setReportMessage]=useState("");
-  const [appSettings,setAppSettings]=useState<AppSettings>({shopName:"",ownerName:"",financePinSet:false,appPinSet:false,theme:"dark",initialized:false,largeCutPrice:30,smallCutPrice:25});const [settingsShopName,setSettingsShopName]=useState("");const [settingsOwnerName,setSettingsOwnerName]=useState("");const [settingsFinancePin,setSettingsFinancePin]=useState("");const [settingsAppPin,setSettingsAppPin]=useState("");const [settingsLargeCutPrice,setSettingsLargeCutPrice]=useState("30");const [settingsSmallCutPrice,setSettingsSmallCutPrice]=useState("25");const [cutPriceMessage,setCutPriceMessage]=useState("");const [appPinAttempt,setAppPinAttempt]=useState("");const [appPinError,setAppPinError]=useState("");const [appAccessChecked,setAppAccessChecked]=useState(false);const [appUnlocked,setAppUnlocked]=useState(false);const [accessMessage,setAccessMessage]=useState("");
-  const total=numericValue(totalPrice),paid=numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const currentCutPrice=thobeSize==="كبير"?appSettings.largeCutPrice:appSettings.smallCutPrice;const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
+  const [appSettings,setAppSettings]=useState<AppSettings>({shopName:"",ownerName:"",financePinSet:false,appPinSet:false,theme:"dark",initialized:false,largeCutPrice:30,smallCutPrice:25});const [settingsShopName,setSettingsShopName]=useState("");const [settingsOwnerName,setSettingsOwnerName]=useState("");const [settingsFinancePin,setSettingsFinancePin]=useState("");const [settingsAppPin,setSettingsAppPin]=useState("");const [settingsLargeCutPrice,setSettingsLargeCutPrice]=useState("30");const [settingsSmallCutPrice,setSettingsSmallCutPrice]=useState("25");const [cutPriceMessage,setCutPriceMessage]=useState("");const [settingsWorkerName,setSettingsWorkerName]=useState("");const [workerSettingsMessage,setWorkerSettingsMessage]=useState("");const [appPinAttempt,setAppPinAttempt]=useState("");const [appPinError,setAppPinError]=useState("");const [appAccessChecked,setAppAccessChecked]=useState(false);const [appUnlocked,setAppUnlocked]=useState(false);const [accessMessage,setAccessMessage]=useState("");
+  const total=numericValue(totalPrice),paid=numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const currentCutPrice=thobeSize==="كبير"?appSettings.largeCutPrice:appSettings.smallCutPrice;const availableWorkerNames=workerName&&!workerNames.includes(workerName)?[...workerNames,workerName]:workerNames;const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
 
   async function load(){try{setError("");const [dashboard,current,board]=await Promise.all([invoke<Dashboard>("dashboard_summary"),invoke<CurrentSession>("current_session"),invoke<WorkBoardItem[]>("work_board")]);setData(dashboard);setSession(current);setWorkItems(board)}catch{setError("تعذر قراءة بيانات المحل المحلية.")}}
   async function loadDesignOptions(){try{setDesignOptions(await invoke<DesignOption[]>("list_design_options"))}catch{setSettingsError("تعذر قراءة مكتبة الأشكال.")}}
@@ -157,6 +157,8 @@ export default function App(){
   async function loadDailyReport(day=reportDate,period=reportPeriod){try{setDailyReportData(await invoke<DailyReport>("daily_report",{reportDate:day,period}));setReportMessage("")}catch(error){setReportMessage(String(error))}}
   async function loadAppSettings(){try{const next=await invoke<AppSettings>("get_app_settings");setAppSettings(next);setSettingsShopName(next.shopName);setSettingsOwnerName(next.ownerName);setSettingsLargeCutPrice(String(next.largeCutPrice));setSettingsSmallCutPrice(String(next.smallCutPrice));setAppUnlocked(current=>current||!next.appPinSet)}catch{setAccessMessage("تعذر قراءة الصلاحيات.")}finally{setAppAccessChecked(true)}}
   async function loadWorkerNames(){try{setWorkerNames(await invoke<string[]>("list_worker_names"))}catch{setWorkerNames([])}}
+  async function addSavedWorker(event:FormEvent<HTMLFormElement>){event.preventDefault();const name=settingsWorkerName.trim();if(!name){setWorkerSettingsMessage("اكتب اسم العامل أولًا.");return}try{const names=await invoke<string[]>("add_worker",{name});setWorkerNames(names);setSettingsWorkerName("");setWorkerSettingsMessage("تم حفظ العامل وإضافته إلى قائمة المقاسات.")}catch(error){setWorkerSettingsMessage(String(error))}}
+  async function removeSavedWorker(name:string){if(!window.confirm(`حذف العامل "${name}" من قائمة الاختيار؟ سجلاته القديمة في الفواتير لن تُحذف.`))return;try{const names=await invoke<string[]>("delete_worker",{name});setWorkerNames(names);if(workerName===name)setWorkerName("");setWorkerSettingsMessage("تم حذف العامل من قائمة الاختيار.")}catch(error){setWorkerSettingsMessage(String(error))}}
   async function showHistory(){setHistoryOpen(true);try{setHistory(await invoke<SessionEntry[]>("session_history"))}catch{setError("تعذر قراءة سجل التشغيل.")}}
   async function advanceWorkItem(orderId:number){try{setMovingOrder(orderId);setError("");await invoke("advance_order_status",{orderId});await load()}catch{setError("تعذر نقل الثوب إلى المرحلة التالية.")}finally{setMovingOrder(null)}}
   async function retreatWorkItem(orderId:number){try{setMovingOrder(orderId);setError("");await invoke("retreat_order_status",{orderId});await load()}catch{setError("تعذر إرجاع الثوب إلى المرحلة السابقة.")}finally{setMovingOrder(null)}}
@@ -396,7 +398,7 @@ export default function App(){
       <section className="measurement-setup-bar">
         <div className="measurement-setup-card unit-card"><span>وحدة القياس</span><div className="unit-switch"><button type="button" className={unit==="إنش"?"selected":""} disabled={orderLocked} onClick={()=>changeMeasurementUnit("إنش")}>إنش</button><button type="button" className={unit==="سم"?"selected":""} disabled={orderLocked} onClick={()=>changeMeasurementUnit("سم")}>سم</button></div><small>اختيار الوحدة لهذا المقاس</small></div>
         <div className="measurement-setup-card size-card"><span>حجم الثوب</span><div className="size-switch"><button type="button" className={thobeSize==="كبير"?"selected":""} disabled={orderLocked} onClick={()=>chooseThobeSize("كبير")}>كبير</button><button type="button" className={thobeSize==="صغير"?"selected":""} disabled={orderLocked} onClick={()=>chooseThobeSize("صغير")}>صغير</button></div><div className="size-mode-row"><small>{sizeOverride?"اختيار يدوي":"تلقائي: 50 إنش / 127 سم"}</small>{sizeOverride&&!orderLocked&&<button type="button" onClick={restoreAutomaticSize}>رجوع للتلقائي</button>}</div></div>
-        <label className="measurement-setup-card worker-card"><span>عامل القص</span><input list="worker-name-list" disabled={orderLocked} value={workerName} onChange={event=>setWorkerName(event.target.value)} placeholder="اكتب اسم العامل"/><datalist id="worker-name-list">{workerNames.map(name=><option key={name} value={name}/>)}</datalist><small>يُحفظ العامل مع هذا الثوب فقط</small></label>
+        <label className="measurement-setup-card worker-card"><span>عامل القص</span><select disabled={orderLocked} value={workerName} onChange={event=>setWorkerName(event.target.value)}><option value="">اختر العامل</option>{availableWorkerNames.map(name=><option key={name} value={name}>{name}</option>)}</select><small>{workerNames.length?"اختر من العمال المحفوظين في الإعدادات":"أضف العمال أولًا من الإعدادات"}</small></label>
         <div className="measurement-setup-card cut-price-card"><span>أجر القص</span><strong className="numeric">{numberFormat.format(currentCutPrice)} <small>ر.س</small></strong><small>{thobeSize==="كبير"?"سعر الثوب الكبير":"سعر الثوب الصغير"} · من الإعدادات</small></div>
       </section>
 
@@ -454,8 +456,19 @@ export default function App(){
           <button className="settings-primary" type="submit">حفظ أسعار القص</button>
         </form>
 
-        <section className="settings-control-card settings-storage-panel">
+        <section className="settings-control-card settings-workers-card">
           <div className="settings-card-icon">03</div>
+          <div className="settings-card-heading"><span>العمال</span><h2>عمال القص المحفوظون</h2><p>أضف العامل مرة واحدة، وبعدها يظهر اسمه مباشرة في القائمة المنسدلة داخل المقاسات.</p></div>
+          <form className="worker-add-form" onSubmit={event=>void addSavedWorker(event)}>
+            <input value={settingsWorkerName} onChange={event=>setSettingsWorkerName(event.target.value)} placeholder="اسم العامل"/>
+            <button className="settings-primary" type="submit">إضافة عامل</button>
+          </form>
+          <div className="saved-workers-list">{workerNames.length===0?<p>لا يوجد عمال محفوظون حتى الآن.</p>:workerNames.map(name=><div key={name}><span>{name}</span><button type="button" onClick={()=>void removeSavedWorker(name)}>حذف</button></div>)}</div>
+          {workerSettingsMessage&&<p className="settings-message">{workerSettingsMessage}</p>}
+        </section>
+
+        <section className="settings-control-card settings-storage-panel">
+          <div className="settings-card-icon">04</div>
           <div className="settings-section-heading"><div><span>التخزين</span><h2>قاعدة بيانات المحل</h2></div><em>{storage?.isCustom?"مكان مخصص":"المكان الافتراضي"}</em></div>
           <div className="settings-storage-body">
             <div className="settings-path-card"><small>المجلد المستخدم</small><b dir="ltr">{storage?.folder||"جارٍ قراءة المكان…"}</b><small>ملف البيانات</small><span dir="ltr">{storage?.databasePath||"—"}</span></div>
@@ -466,7 +479,7 @@ export default function App(){
       </section>
 
       <section className="settings-library-section">
-        <div className="settings-library-heading"><div><span>04 · مكتبة الأشكال</span><h2>إدارة صور وأنواع الثوب</h2><p>أضف الأنواع والصور ثم استخدمها مباشرة من صفحة المقاسات.</p></div><b>{designOptions.length} عنصر</b></div>
+        <div className="settings-library-heading"><div><span>05 · مكتبة الأشكال</span><h2>إدارة صور وأنواع الثوب</h2><p>أضف الأنواع والصور ثم استخدمها مباشرة من صفحة المقاسات.</p></div><b>{designOptions.length} عنصر</b></div>
         <div className="settings-content-grid">
           <form className="settings-editor-card" onSubmit={event=>void addDesignOption(event)}>
             <div className="settings-section-heading"><div><span>إضافة شكل</span><h2>نوع جديد</h2></div></div>
