@@ -183,7 +183,7 @@ export default function App(){
   async function removeSelectedCustomer(){if(!selectedCustomer||!window.confirm(`حذف العميل ${selectedCustomer.name}؟ لا يمكن التراجع عن الحذف.`))return;try{setCustomerSearchMessage("");await invoke("delete_customer",{customerId:selectedCustomer.id});setCustomerResults(current=>current.filter(item=>item.id!==selectedCustomer.id));setSelectedCustomer(null);setCustomerInvoices([]);setCustomerEditing(false);setCustomerSearchMessage("تم حذف العميل.")}catch(error){setCustomerSearchMessage(String(error))}}
   function draftsFromInvoice(saved:SavedInvoice){
     const details=parseObject(saved.detailsJson);
-    const storedUnit=details.unit==="إنش"?"إنش" as const:"سم" as const;
+    const storedUnit=details.unit==="سم"?"سم" as const:"إنش" as const;
     const rawThobes=Array.isArray(details.thobes)?details.thobes:[];
     const legacy={measurements:parseObject(saved.measurementsJson),fabric:parseObject(saved.fabricJson),fabricItemId:details.fabricItemId,fabricMeters:details.fabricMeters,designs:parseObject(saved.designsJson),thobeType:details.thobeType,sleeveMode:details.sleeveMode,collarMode:details.collarMode,neckButtonCount:details.neckButtonCount,neckButtonType:details.neckButtonType,workerName:details.workerName,sizeCategory:details.sizeCategory,sizeOverride:details.sizeOverride,notes:saved.notes};
     const sources=rawThobes.length?rawThobes:[legacy];
