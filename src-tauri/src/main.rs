@@ -95,7 +95,7 @@ struct DailyReport{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String,initialized:bool}
+struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String,initialized:bool,large_cut_price:f64,small_cut_price:f64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -103,11 +103,15 @@ struct FabricUsagePayload{fabric_id:i64,thobe_index:i64,meters:f64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
+struct WorkerCutPayload{thobe_index:i64,worker_name:String,thobe_size:String,amount:f64}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
 struct InvoicePayload{
  id:Option<i64>,customer_id:i64,weight:String,delivery_date:String,day_count:i64,total_thobes:i64,
  total_price:String,paid_amount:String,payment_method:String,discount:String,notes:String,
  measurements_json:String,fabric_json:String,designs_json:String,details_json:String,
- fabric_usages:Vec<FabricUsagePayload>,confirm_low_stock:bool
+ fabric_usages:Vec<FabricUsagePayload>,worker_cuts:Vec<WorkerCutPayload>,confirm_low_stock:bool
 }
 
 #[derive(Serialize)]
@@ -322,6 +326,17 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    notes TEXT NOT NULL DEFAULT '',
    created_at TEXT NOT NULL,
    FOREIGN KEY(supplier_id) REFERENCES suppliers(id)
+  );
+  CREATE TABLE IF NOT EXISTS worker_cut_entries(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   invoice_id INTEGER NOT NULL,
+   thobe_index INTEGER NOT NULL,
+   worker_name TEXT NOT NULL,
+   thobe_size TEXT NOT NULL,
+   amount REAL NOT NULL DEFAULT 0,
+   created_at TEXT NOT NULL,
+   UNIQUE(invoice_id,thobe_index),
+   FOREIGN KEY(invoice_id) REFERENCES invoices(id)
   );
   CREATE TABLE IF NOT EXISTS app_settings(
    setting_key TEXT PRIMARY KEY,
@@ -1077,8 +1092,10 @@ fn get_app_settings(app:AppHandle)->Result<AppSettings,String>{
  let app_pin=value("app_pin");
  let saved_theme=value("theme");
  let shop_name=value("shop_name");let owner_name=value("owner_name");
+ let large_cut_price=value("large_cut_price").parse::<f64>().ok().filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(30.0);
+ let small_cut_price=value("small_cut_price").parse::<f64>().ok().filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(25.0);
  let initialized=!shop_name.trim().is_empty()&&!owner_name.trim().is_empty()&&!finance_pin.is_empty()&&!app_pin.is_empty();
- Ok(AppSettings{shop_name,owner_name,finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()},initialized})
+ Ok(AppSettings{shop_name,owner_name,finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()},initialized,large_cut_price,small_cut_price})
 }
 
 #[tauri::command]
@@ -1092,6 +1109,23 @@ fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pi
  if !pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('finance_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[pin]).map_err(|e|e.to_string())?;}
  if !entry_pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('app_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[entry_pin]).map_err(|e|e.to_string())?;}
  get_app_settings(app)
+}
+
+#[tauri::command]
+fn save_cut_prices(app:AppHandle,large_cut_price:f64,small_cut_price:f64)->Result<AppSettings,String>{
+ if !large_cut_price.is_finite()||large_cut_price<0.0||!small_cut_price.is_finite()||small_cut_price<0.0{return Err("أسعار القص يجب أن تكون أرقامًا صحيحة وغير سالبة".into())}
+ let conn=db(&app)?;
+ conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('large_cut_price',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[large_cut_price.to_string()]).map_err(|e|e.to_string())?;
+ conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('small_cut_price',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[small_cut_price.to_string()]).map_err(|e|e.to_string())?;
+ get_app_settings(app)
+}
+
+#[tauri::command]
+fn list_worker_names(app:AppHandle)->Result<Vec<String>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare("SELECT worker_name FROM worker_cut_entries WHERE trim(worker_name)<>'' GROUP BY worker_name ORDER BY MAX(id) DESC,worker_name COLLATE NOCASE").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
 #[tauri::command]
@@ -1252,6 +1286,24 @@ fn apply_invoice_fabric_usage(transaction:&rusqlite::Transaction<'_>,invoice_id:
  Ok(())
 }
 
+fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i64,cuts:&[WorkerCutPayload])->Result<(),String>{
+ transaction.execute("DELETE FROM worker_cut_entries WHERE invoice_id=?1",[invoice_id]).map_err(|e|e.to_string())?;
+ for cut in cuts{
+  let worker=cut.worker_name.trim();
+  if worker.is_empty(){continue}
+  if cut.thobe_index<0{return Err("رقم الثوب في أجر القص غير صحيح".into())}
+  let size=cut.thobe_size.trim();
+  if size!="كبير"&&size!="صغير"{return Err("حجم الثوب في أجر القص غير صحيح".into())}
+  if !cut.amount.is_finite()||cut.amount<0.0{return Err("أجر القص غير صحيح".into())}
+  transaction.execute(
+   "INSERT INTO worker_cut_entries(invoice_id,thobe_index,worker_name,thobe_size,amount,created_at)
+    VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))",
+   params![invoice_id,cut.thobe_index,worker,size,cut.amount]
+  ).map_err(|e|e.to_string())?;
+ }
+ Ok(())
+}
+
 #[tauri::command]
 fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,String>{
  let mut conn=db(&app)?;
@@ -1273,6 +1325,7 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
   }
   transaction.execute("UPDATE orders SET quantity=?1,delivery_date=NULLIF(?2,'') WHERE id=?3",params![payload.total_thobes,&payload.delivery_date,order_id]).map_err(|e|e.to_string())?;
   apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
+  apply_invoice_worker_cuts(&transaction,id,&payload.worker_cuts)?;
   transaction.commit().map_err(|e|e.to_string())?;
   return Ok(InvoiceRecord{id,invoice_number,created_at})
  }
@@ -1294,6 +1347,7 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
   transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("دفعة أولية للفاتورة {}",invoice_number),initial_payment,&payload.payment_method]).map_err(|e|e.to_string())?;
  }
  apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
+ apply_invoice_worker_cuts(&transaction,id,&payload.worker_cuts)?;
  let created_at:String=transaction.query_row("SELECT created_at FROM invoices WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
  Ok(InvoiceRecord{id,invoice_number,created_at})
@@ -1319,7 +1373,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
