@@ -4013,3 +4013,171 @@ button{font:inherit}
     border-top:0!important;
   }
 }
+
+
+/* ---------- Order page viewport scrolling + saved workers ---------- */
+/* Keep desktop shell fixed, but make the order workspace itself scrollable.
+   The scrollbar is visually hidden so resizing the window does not create a stray rail. */
+.order-page.compact-order{
+  width:100%!important;
+  max-width:none!important;
+  height:calc(100vh - 82px)!important;
+  min-height:0!important;
+  max-height:calc(100vh - 82px)!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  scrollbar-width:none!important;
+  -ms-overflow-style:none!important;
+  display:block!important;
+  padding:8px 4px 110px!important;
+}
+.order-page.compact-order::-webkit-scrollbar{
+  width:0!important;
+  height:0!important;
+  display:none!important;
+}
+
+/* Make sure the complete measurement grid participates in the page scroll. */
+.order-page.compact-order .measure-columns,
+.order-page.compact-order .measure-column{
+  max-height:none!important;
+  overflow:visible!important;
+}
+.order-page.compact-order .compact-order-actions{
+  margin-bottom:18px!important;
+}
+
+/* Saved worker selector */
+.worker-card select{
+  width:100%!important;
+  height:36px!important;
+  min-width:0!important;
+  padding:0 9px!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:8px!important;
+  color:var(--text)!important;
+  background:var(--surface-soft)!important;
+  font:inherit!important;
+  cursor:pointer!important;
+}
+.worker-card:focus-within{
+  border-color:var(--accent)!important;
+  box-shadow:var(--focus)!important;
+}
+
+/* Settings: saved workers */
+.settings-overview-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+}
+.settings-workers-card{
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr)!important;
+  grid-template-areas:
+    "icon heading"
+    "form form"
+    "list list"
+    "message message"!important;
+  align-content:start!important;
+  gap:10px!important;
+}
+.settings-workers-card>.settings-card-icon{
+  grid-area:icon!important;
+  margin:0!important;
+}
+.settings-workers-card>.settings-card-heading{
+  grid-area:heading!important;
+}
+.worker-add-form{
+  grid-area:form!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:8px!important;
+}
+.worker-add-form input{
+  width:100%!important;
+  min-width:0!important;
+  height:39px!important;
+  padding:0 10px!important;
+  border:1px solid var(--line-strong)!important;
+  border-radius:9px!important;
+  color:var(--text)!important;
+  background:var(--surface-soft)!important;
+}
+.worker-add-form button{
+  min-width:105px!important;
+  min-height:39px!important;
+  border-radius:9px!important;
+}
+.saved-workers-list{
+  grid-area:list!important;
+  min-height:72px!important;
+  max-height:165px!important;
+  overflow-y:auto!important;
+  display:grid!important;
+  align-content:start!important;
+  gap:6px!important;
+  padding:8px!important;
+  border:1px solid var(--line)!important;
+  border-radius:10px!important;
+  background:var(--surface-soft)!important;
+}
+.saved-workers-list>p{
+  margin:auto!important;
+  color:var(--muted)!important;
+  font-size:.65rem!important;
+}
+.saved-workers-list>div{
+  min-height:34px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:8px!important;
+  padding:5px 8px!important;
+  border:1px solid var(--line)!important;
+  border-radius:8px!important;
+  background:var(--surface)!important;
+}
+.saved-workers-list>div>span{
+  overflow:hidden!important;
+  color:var(--text)!important;
+  font-size:.7rem!important;
+  font-weight:800!important;
+  white-space:nowrap!important;
+  text-overflow:ellipsis!important;
+}
+.saved-workers-list>div>button{
+  min-height:26px!important;
+  padding:0 9px!important;
+  border:1px solid #c9aaa2!important;
+  border-radius:7px!important;
+  color:var(--danger)!important;
+  background:var(--danger-soft)!important;
+  cursor:pointer!important;
+  font-size:.6rem!important;
+}
+.settings-workers-card>.settings-message{
+  grid-area:message!important;
+  margin:0!important;
+}
+
+@media(max-width:900px){
+  .settings-overview-grid{
+    grid-template-columns:1fr!important;
+  }
+  .worker-add-form{
+    grid-template-columns:1fr!important;
+  }
+  .worker-add-form button{
+    width:100%!important;
+  }
+}
+
+@media(max-height:720px){
+  .order-page.compact-order{
+    height:calc(100vh - 72px)!important;
+    max-height:calc(100vh - 72px)!important;
+    padding-bottom:130px!important;
+  }
+}
