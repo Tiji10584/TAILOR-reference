@@ -103,7 +103,7 @@ struct FabricUsagePayload{fabric_id:i64,thobe_index:i64,meters:f64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
-struct WorkerCutPayload{thobe_index:i64,worker_name:String,thobe_size:String,amount:f64}
+struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<String>,thobe_size:String,amount:f64}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -111,6 +111,26 @@ struct WorkerLedgerEntry{
  id:i64,invoice_id:i64,invoice_number:String,customer_name:String,thobe_index:i64,
  thobe_size:String,amount:f64,created_at:String,worker_name:String
 }
+
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkerProfile{
+ id:i64,name:String,role:String,pay_mode:String,monthly_salary:f64,large_rate:f64,small_rate:f64,
+ salary_start:String,active:bool,archived_at:String,created_at:String
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkerMovement{
+ id:i64,entry_type:String,description:String,amount:f64,created_at:String,
+ invoice_number:String,customer_name:String,thobe_index:i64,thobe_size:String,payment_method:String
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkerSalaryChange{effective_month:String,monthly_salary:f64}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkerAccount{worker:WorkerProfile,movements:Vec<WorkerMovement>,salary_changes:Vec<WorkerSalaryChange>}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -350,6 +370,35 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    UNIQUE(invoice_id,thobe_index),
    FOREIGN KEY(invoice_id) REFERENCES invoices(id)
   );
+  CREATE TABLE IF NOT EXISTS worker_tailor_entries(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   invoice_id INTEGER NOT NULL,
+   thobe_index INTEGER NOT NULL,
+   worker_id INTEGER NOT NULL,
+   thobe_size TEXT NOT NULL,
+   amount REAL NOT NULL DEFAULT 0,
+   created_at TEXT NOT NULL,
+   UNIQUE(invoice_id,thobe_index),
+   FOREIGN KEY(invoice_id) REFERENCES invoices(id),
+   FOREIGN KEY(worker_id) REFERENCES workers(id)
+  );
+  CREATE TABLE IF NOT EXISTS worker_withdrawals(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   worker_id INTEGER NOT NULL,
+   kind TEXT NOT NULL,
+   amount REAL NOT NULL,
+   details TEXT NOT NULL DEFAULT '',
+   payment_method TEXT NOT NULL DEFAULT '',
+   created_at TEXT NOT NULL,
+   FOREIGN KEY(worker_id) REFERENCES workers(id)
+  );
+  CREATE TABLE IF NOT EXISTS worker_salary_changes(
+   worker_id INTEGER NOT NULL,
+   effective_month TEXT NOT NULL,
+   monthly_salary REAL NOT NULL,
+   PRIMARY KEY(worker_id,effective_month),
+   FOREIGN KEY(worker_id) REFERENCES workers(id)
+  );
   CREATE TABLE IF NOT EXISTS app_settings(
    setting_key TEXT PRIMARY KEY,
    setting_value TEXT NOT NULL DEFAULT ''
@@ -375,14 +424,32 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"financial_entries","reference_type")?{conn.execute("ALTER TABLE financial_entries ADD COLUMN reference_type TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"financial_entries","reference_id")?{conn.execute("ALTER TABLE financial_entries ADD COLUMN reference_id INTEGER",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"extra_transactions","worker_name")?{conn.execute("ALTER TABLE extra_transactions ADD COLUMN worker_name TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"workers","role")?{conn.execute("ALTER TABLE workers ADD COLUMN role TEXT NOT NULL DEFAULT 'قصاص'",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"workers","pay_mode")?{conn.execute("ALTER TABLE workers ADD COLUMN pay_mode TEXT NOT NULL DEFAULT 'قطعة'",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"workers","monthly_salary")?{conn.execute("ALTER TABLE workers ADD COLUMN monthly_salary REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"workers","large_rate")?{
+  conn.execute("ALTER TABLE workers ADD COLUMN large_rate REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;
+  conn.execute("UPDATE workers SET large_rate=COALESCE((SELECT CAST(setting_value AS REAL) FROM app_settings WHERE setting_key='large_cut_price'),30)",[]).map_err(|e|e.to_string())?;
+ }
+ if !has_column(&conn,"workers","small_rate")?{
+  conn.execute("ALTER TABLE workers ADD COLUMN small_rate REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;
+  conn.execute("UPDATE workers SET small_rate=COALESCE((SELECT CAST(setting_value AS REAL) FROM app_settings WHERE setting_key='small_cut_price'),25)",[]).map_err(|e|e.to_string())?;
+ }
+ if !has_column(&conn,"workers","salary_start")?{conn.execute("ALTER TABLE workers ADD COLUMN salary_start TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"workers","active")?{conn.execute("ALTER TABLE workers ADD COLUMN active INTEGER NOT NULL DEFAULT 1",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"workers","archived_at")?{conn.execute("ALTER TABLE workers ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ conn.execute("UPDATE workers SET salary_start=substr(created_at,1,7)||'-01' WHERE salary_start=''",[]).map_err(|e|e.to_string())?;
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
   UPDATE customers SET customer_code=CAST(id AS TEXT);
  UPDATE invoices SET invoice_number='__invoice_' || id;
  UPDATE invoices SET invoice_number=CAST(id AS TEXT);
   UPDATE design_options SET category='الكبك' WHERE category='الكباك';
-  INSERT OR IGNORE INTO workers(name,created_at)
-  SELECT trim(worker_name),MIN(created_at)
+  INSERT OR IGNORE INTO workers(name,created_at,role,pay_mode,large_rate,small_rate,salary_start)
+  SELECT trim(worker_name),MIN(created_at),'قصاص','قطعة',
+   COALESCE((SELECT CAST(setting_value AS REAL) FROM app_settings WHERE setting_key='large_cut_price'),30),
+   COALESCE((SELECT CAST(setting_value AS REAL) FROM app_settings WHERE setting_key='small_cut_price'),25),
+   substr(MIN(created_at),1,7)||'-01'
   FROM worker_cut_entries
   WHERE trim(worker_name)<>''
   GROUP BY trim(worker_name);
@@ -1137,32 +1204,127 @@ fn save_cut_prices(app:AppHandle,large_cut_price:f64,small_cut_price:f64)->Resul
  get_app_settings(app)
 }
 
+fn read_worker(row:&rusqlite::Row<'_>)->rusqlite::Result<WorkerProfile>{
+ Ok(WorkerProfile{id:row.get(0)?,name:row.get(1)?,role:row.get(2)?,pay_mode:row.get(3)?,
+  monthly_salary:row.get(4)?,large_rate:row.get(5)?,small_rate:row.get(6)?,
+  salary_start:row.get(7)?,active:row.get::<_,i64>(8)?!=0,archived_at:row.get(9)?,created_at:row.get(10)?})
+}
+fn worker_from_db(conn:&Connection,id:i64)->Result<WorkerProfile,String>{
+ conn.query_row("SELECT id,name,role,pay_mode,monthly_salary,large_rate,small_rate,salary_start,active,archived_at,created_at FROM workers WHERE id=?1",[id],read_worker).map_err(|_|"العامل غير موجود".into())
+}
+#[tauri::command]
+fn list_workers(app:AppHandle)->Result<Vec<WorkerProfile>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare("SELECT id,name,role,pay_mode,monthly_salary,large_rate,small_rate,salary_start,active,archived_at,created_at FROM workers ORDER BY active DESC,id DESC").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],read_worker).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
 #[tauri::command]
 fn list_worker_names(app:AppHandle)->Result<Vec<String>,String>{
  let conn=db(&app)?;
- let mut statement=conn.prepare("SELECT name FROM workers ORDER BY id ASC").map_err(|e|e.to_string())?;
+ let mut statement=conn.prepare("SELECT name FROM workers WHERE active=1 AND role='قصاص' ORDER BY id ASC").map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
-
+#[tauri::command]
+fn save_worker(app:AppHandle,id:Option<i64>,name:String,role:String,pay_mode:String,monthly_salary:f64,large_rate:f64,small_rate:f64,salary_start:String)->Result<WorkerProfile,String>{
+ let name=name.trim();
+ if name.is_empty(){return Err("اكتب اسم العامل".into())}
+ if role!="قصاص"&&role!="خياط"{return Err("اختر وظيفة العامل".into())}
+ if pay_mode!="قطعة"&&pay_mode!="راتب"{return Err("اختر طريقة الأجر".into())}
+ if !monthly_salary.is_finite()||monthly_salary<0.0||!large_rate.is_finite()||large_rate<0.0||!small_rate.is_finite()||small_rate<0.0{return Err("قيمة الأجر غير صحيحة".into())}
+ if pay_mode=="راتب"&&monthly_salary<=0.0{return Err("حدد راتبًا شهريًا أكبر من صفر".into())}
+ let month=salary_start.trim();
+ let digits=month.as_bytes();
+ let valid_month=digits.len()==7&&digits[4]==b'-'&&digits[..4].iter().all(u8::is_ascii_digit)&&digits[5..].iter().all(u8::is_ascii_digit)&&month[5..].parse::<u8>().is_ok_and(|m|m>=1&&m<=12);
+ if !valid_month{return Err("شهر بداية الراتب غير صحيح".into())}
+ let mut conn=db(&app)?;
+ let current_month:String=conn.query_row("SELECT strftime('%Y-%m','now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ if month>current_month.as_str(){return Err("لا يمكن بدء الراتب في شهر مستقبلي".into())}
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let (worker_id,effective_month)=if let Some(worker_id)=id{
+  let (saved_name,saved_role):(String,String)=transaction.query_row("SELECT name,role FROM workers WHERE id=?1",[worker_id],|row|Ok((row.get(0)?,row.get(1)?))).map_err(|_|"العامل غير موجود".to_string())?;
+  if saved_name!=name{return Err("لا يمكن تغيير اسم العامل بعد حفظ الفواتير. أضف عاملًا جديدًا بالاسم الجديد.".into())}
+  if saved_role!=role{return Err("وظيفة العامل محفوظة في سجلات الفواتير. أضف عاملًا جديدًا لوظيفة مختلفة.".into())}
+  transaction.execute("DELETE FROM worker_salary_changes WHERE worker_id=?1 AND effective_month>?2",params![worker_id,current_month]).map_err(|e|e.to_string())?;
+  transaction.execute("UPDATE workers SET role=?1,pay_mode=?2,monthly_salary=?3,large_rate=?4,small_rate=?5,active=1,archived_at='' WHERE id=?6",params![role,pay_mode,monthly_salary,large_rate,small_rate,worker_id]).map_err(|e|e.to_string())?;
+  (worker_id,current_month)
+ }else{
+  transaction.execute("INSERT INTO workers(name,role,pay_mode,monthly_salary,large_rate,small_rate,salary_start,active,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,1,datetime('now','localtime'))",
+   params![name,role,pay_mode,monthly_salary,large_rate,small_rate,format!("{month}-01")]).map_err(|e|if e.to_string().contains("UNIQUE"){ "الاسم موجود بالفعل. افتح ملف العامل لتعديله أو تفعيله.".into() }else{ e.to_string() })?;
+  (transaction.last_insert_rowid(),month.to_string())
+ };
+ transaction.execute("INSERT INTO worker_salary_changes(worker_id,effective_month,monthly_salary) VALUES(?1,?2,?3) ON CONFLICT(worker_id,effective_month) DO UPDATE SET monthly_salary=excluded.monthly_salary",
+  params![worker_id,effective_month,if pay_mode=="راتب"{monthly_salary}else{0.0}]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())?;
+ worker_from_db(&conn,worker_id)
+}
 #[tauri::command]
 fn add_worker(app:AppHandle,name:String)->Result<Vec<String>,String>{
  let normalized=name.trim();
  if normalized.is_empty(){return Err("اكتب اسم العامل".into())}
  let conn=db(&app)?;
- conn.execute("INSERT OR IGNORE INTO workers(name,created_at) VALUES(?1,datetime('now','localtime'))",[normalized]).map_err(|e|e.to_string())?;
+ conn.execute("INSERT INTO workers(name,created_at,salary_start,large_rate,small_rate) VALUES(?1,datetime('now','localtime'),date('now','localtime','start of month'),COALESCE((SELECT CAST(setting_value AS REAL) FROM app_settings WHERE setting_key='large_cut_price'),30),COALESCE((SELECT CAST(setting_value AS REAL) FROM app_settings WHERE setting_key='small_cut_price'),25)) ON CONFLICT(name) DO UPDATE SET active=1,archived_at=''",[normalized]).map_err(|e|e.to_string())?;
  list_worker_names(app)
 }
-
 #[tauri::command]
 fn delete_worker(app:AppHandle,name:String)->Result<Vec<String>,String>{
  let normalized=name.trim();
  if normalized.is_empty(){return Err("اسم العامل غير صحيح".into())}
  let conn=db(&app)?;
- conn.execute("DELETE FROM workers WHERE name=?1",[normalized]).map_err(|e|e.to_string())?;
+ conn.execute("UPDATE workers SET active=0,archived_at=datetime('now','localtime') WHERE name=?1",[normalized]).map_err(|e|e.to_string())?;
+ conn.execute("INSERT OR REPLACE INTO worker_salary_changes(worker_id,effective_month,monthly_salary) SELECT id,strftime('%Y-%m',date('now','localtime','start of month','+1 month')),0 FROM workers WHERE name=?1",[normalized]).map_err(|e|e.to_string())?;
  list_worker_names(app)
 }
-
+#[tauri::command]
+fn archive_worker(app:AppHandle,worker_id:i64)->Result<(),String>{
+ let conn=db(&app)?;
+ let updated=conn.execute("UPDATE workers SET active=0,archived_at=datetime('now','localtime') WHERE id=?1",[worker_id]).map_err(|e|e.to_string())?;
+ if updated==0{return Err("العامل غير موجود".into())}
+ conn.execute("INSERT OR REPLACE INTO worker_salary_changes(worker_id,effective_month,monthly_salary) VALUES(?1,strftime('%Y-%m',date('now','localtime','start of month','+1 month')),0)",[worker_id]).map_err(|e|e.to_string())?;
+ Ok(())
+}
+#[tauri::command]
+fn worker_account(app:AppHandle,worker_id:i64)->Result<WorkerAccount,String>{
+ let conn=db(&app)?;
+ let worker=worker_from_db(&conn,worker_id)?;
+ let mut statement=conn.prepare(
+  "SELECT w.id,'قص',printf('فاتورة %s · الثوب %d',i.invoice_number,w.thobe_index+1),w.amount,w.created_at,i.invoice_number,COALESCE(c.name,''),w.thobe_index,w.thobe_size,''
+   FROM worker_cut_entries w JOIN invoices i ON i.id=w.invoice_id LEFT JOIN customers c ON c.id=i.customer_id WHERE w.worker_name=?1 AND w.amount>0
+   UNION ALL
+   SELECT t.id,'خياطة',printf('فاتورة %s · الثوب %d',i.invoice_number,t.thobe_index+1),t.amount,t.created_at,i.invoice_number,COALESCE(c.name,''),t.thobe_index,t.thobe_size,''
+   FROM worker_tailor_entries t JOIN invoices i ON i.id=t.invoice_id LEFT JOIN customers c ON c.id=i.customer_id WHERE t.worker_id=?2 AND t.amount>0
+   UNION ALL
+   SELECT d.id,CASE d.kind WHEN 'نقدي' THEN 'سحب نقدي' ELSE 'سحب عيني' END,d.details,-d.amount,d.created_at,'','',-1,'',d.payment_method
+   FROM worker_withdrawals d WHERE d.worker_id=?2
+   ORDER BY created_at ASC,id ASC"
+ ).map_err(|e|e.to_string())?;
+ let movements=statement.query_map(params![&worker.name,worker_id],|row|Ok(WorkerMovement{
+  id:row.get(0)?,entry_type:row.get(1)?,description:row.get(2)?,amount:row.get(3)?,created_at:row.get(4)?,
+  invoice_number:row.get(5)?,customer_name:row.get(6)?,thobe_index:row.get(7)?,thobe_size:row.get(8)?,payment_method:row.get(9)?
+ })).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+ let mut salary_query=conn.prepare("SELECT effective_month,monthly_salary FROM worker_salary_changes WHERE worker_id=?1 ORDER BY effective_month").map_err(|e|e.to_string())?;
+ let salary_changes=salary_query.query_map([worker_id],|row|Ok(WorkerSalaryChange{effective_month:row.get(0)?,monthly_salary:row.get(1)?})).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+ Ok(WorkerAccount{worker,movements,salary_changes})
+}
+#[tauri::command]
+fn record_worker_withdrawal(app:AppHandle,worker_id:i64,kind:String,amount:f64,details:String,payment_method:String)->Result<(),String>{
+ if kind!="نقدي"&&kind!="عيني"{return Err("حدد نوع السحب".into())}
+ if !amount.is_finite()||amount<=0.0{return Err("قيمة السحب يجب أن تكون أكبر من صفر".into())}
+ if kind=="عيني"&&details.trim().is_empty(){return Err("اكتب وصف الشيء الذي سحبه العامل".into())}
+ if kind=="نقدي"&&payment_method!="كاش"&&payment_method!="شبكة"&&payment_method!="تحويل"{return Err("طريقة الدفع غير صحيحة".into())}
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let name:String=transaction.query_row("SELECT name FROM workers WHERE id=?1 AND active=1",[worker_id],|row|row.get(0)).map_err(|_|"العامل غير موجود أو مؤرشف".to_string())?;
+ transaction.execute("INSERT INTO worker_withdrawals(worker_id,kind,amount,details,payment_method,created_at) VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))",
+  params![worker_id,kind,amount,details.trim(),if kind=="نقدي"{payment_method.as_str()}else{""}]).map_err(|e|e.to_string())?;
+ let draw_id=transaction.last_insert_rowid();
+ if kind=="نقدي"{
+  transaction.execute("INSERT INTO financial_entries(entry_type,description,amount,payment_method,created_at,reference_type,reference_id) VALUES('مصروف',?1,?2,?3,datetime('now','localtime'),'سحب عامل',?4)",
+   params![format!("سحب العامل {name} — {}",details.trim()),amount,payment_method,draw_id]).map_err(|e|e.to_string())?;
+ }
+ transaction.commit().map_err(|e|e.to_string())
+}
 
 #[tauri::command]
 fn worker_ledger(app:AppHandle,name:Option<String>)->Result<Vec<WorkerLedgerEntry>,String>{
@@ -1344,19 +1506,64 @@ fn apply_invoice_fabric_usage(transaction:&rusqlite::Transaction<'_>,invoice_id:
 }
 
 fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i64,cuts:&[WorkerCutPayload])->Result<(),String>{
- transaction.execute("DELETE FROM worker_cut_entries WHERE invoice_id=?1",[invoice_id]).map_err(|e|e.to_string())?;
+ let mut indexes=std::collections::HashSet::new();
  for cut in cuts{
-  let worker=cut.worker_name.trim();
-  if worker.is_empty(){continue}
-  if cut.thobe_index<0{return Err("رقم الثوب في أجر القص غير صحيح".into())}
+  if cut.thobe_index<0||!indexes.insert(cut.thobe_index){return Err("رقم الثوب في أجور العمال غير صحيح أو مكرر".into())}
   let size=cut.thobe_size.trim();
-  if size!="كبير"&&size!="صغير"{return Err("حجم الثوب في أجر القص غير صحيح".into())}
+  if size!="كبير"&&size!="صغير"{return Err("حجم الثوب في أجر العامل غير صحيح".into())}
   if !cut.amount.is_finite()||cut.amount<0.0{return Err("أجر القص غير صحيح".into())}
-  transaction.execute(
-   "INSERT INTO worker_cut_entries(invoice_id,thobe_index,worker_name,thobe_size,amount,created_at)
-    VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))",
-   params![invoice_id,cut.thobe_index,worker,size,cut.amount]
-  ).map_err(|e|e.to_string())?;
+  let worker=cut.worker_name.trim();
+  if !worker.is_empty(){
+   let mode:String=transaction.query_row("SELECT pay_mode FROM workers WHERE name=?1 AND role='قصاص'",[worker],|row|row.get(0)).map_err(|_|"القصاص غير موجود".to_string())?;
+   let existing:Option<(String,String,f64)>=transaction.query_row(
+    "SELECT worker_name,thobe_size,amount FROM worker_cut_entries WHERE invoice_id=?1 AND thobe_index=?2",
+    params![invoice_id,cut.thobe_index],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
+   ).optional().map_err(|e|e.to_string())?;
+   let earned=match existing{
+    Some((old_worker,old_size,old_amount)) if old_worker==worker&&old_size==size=>old_amount,
+    _ if mode=="قطعة"=>cut.amount,
+    _=>0.0
+   };
+   transaction.execute(
+    "INSERT INTO worker_cut_entries(invoice_id,thobe_index,worker_name,thobe_size,amount,created_at)
+     VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))
+     ON CONFLICT(invoice_id,thobe_index) DO UPDATE SET worker_name=excluded.worker_name,thobe_size=excluded.thobe_size,amount=excluded.amount",
+    params![invoice_id,cut.thobe_index,worker,size,earned]
+   ).map_err(|e|e.to_string())?;
+  }
+  if let Some(name)=cut.tailor_name.as_deref().map(str::trim).filter(|value|!value.is_empty()){
+   let (worker_id,mode,large,small):(i64,String,f64,f64)=transaction.query_row(
+    "SELECT id,pay_mode,large_rate,small_rate FROM workers WHERE name=?1 AND role='خياط'",[name],
+    |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))
+   ).map_err(|_|"الخياط غير موجود".to_string())?;
+   let existing:Option<(i64,String,f64)>=transaction.query_row(
+    "SELECT worker_id,thobe_size,amount FROM worker_tailor_entries WHERE invoice_id=?1 AND thobe_index=?2",
+    params![invoice_id,cut.thobe_index],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
+   ).optional().map_err(|e|e.to_string())?;
+   let earned=match existing{
+    Some((old_id,old_size,old_amount)) if old_id==worker_id&&old_size==size=>old_amount,
+    _ if mode=="قطعة"=>if size=="كبير"{large}else{small},
+    _=>0.0
+   };
+   transaction.execute(
+    "INSERT INTO worker_tailor_entries(invoice_id,thobe_index,worker_id,thobe_size,amount,created_at)
+     VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))
+     ON CONFLICT(invoice_id,thobe_index) DO UPDATE SET worker_id=excluded.worker_id,thobe_size=excluded.thobe_size,amount=excluded.amount",
+    params![invoice_id,cut.thobe_index,worker_id,size,earned]
+   ).map_err(|e|e.to_string())?;
+  }
+ }
+ let placeholders=cuts.iter().map(|cut|cut.thobe_index.to_string()).collect::<Vec<_>>().join(",");
+ if placeholders.is_empty(){
+  transaction.execute("DELETE FROM worker_cut_entries WHERE invoice_id=?1",[invoice_id]).map_err(|e|e.to_string())?;
+  transaction.execute("DELETE FROM worker_tailor_entries WHERE invoice_id=?1",[invoice_id]).map_err(|e|e.to_string())?;
+ }else{
+  transaction.execute(&format!("DELETE FROM worker_cut_entries WHERE invoice_id=?1 AND thobe_index NOT IN ({placeholders})"),[invoice_id]).map_err(|e|e.to_string())?;
+  transaction.execute(&format!("DELETE FROM worker_tailor_entries WHERE invoice_id=?1 AND thobe_index NOT IN ({placeholders})"),[invoice_id]).map_err(|e|e.to_string())?;
+  for cut in cuts{
+   if cut.worker_name.trim().is_empty(){transaction.execute("DELETE FROM worker_cut_entries WHERE invoice_id=?1 AND thobe_index=?2",params![invoice_id,cut.thobe_index]).map_err(|e|e.to_string())?;}
+   if cut.tailor_name.as_deref().unwrap_or("").trim().is_empty(){transaction.execute("DELETE FROM worker_tailor_entries WHERE invoice_id=?1 AND thobe_index=?2",params![invoice_id,cut.thobe_index]).map_err(|e|e.to_string())?;}
+  }
  }
  Ok(())
 }
@@ -1430,7 +1637,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,add_worker,delete_worker,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }
