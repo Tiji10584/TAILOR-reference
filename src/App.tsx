@@ -141,6 +141,19 @@ export default function App(){
   const [reportDate,setReportDate]=useState(()=>dateInputValue(new Date()));const [reportPeriod,setReportPeriod]=useState<"يومي"|"شهري"|"سنوي">("يومي");const [dailyReportData,setDailyReportData]=useState<DailyReport|null>(null);const [reportMessage,setReportMessage]=useState("");
   const [appSettings,setAppSettings]=useState<AppSettings>({shopName:"",ownerName:"",financePinSet:false,appPinSet:false,theme:"dark",initialized:false,largeCutPrice:30,smallCutPrice:25});const [settingsShopName,setSettingsShopName]=useState("");const [settingsOwnerName,setSettingsOwnerName]=useState("");const [settingsFinancePin,setSettingsFinancePin]=useState("");const [settingsAppPin,setSettingsAppPin]=useState("");const [settingsLargeCutPrice,setSettingsLargeCutPrice]=useState("30");const [settingsSmallCutPrice,setSettingsSmallCutPrice]=useState("25");const [cutPriceMessage,setCutPriceMessage]=useState("");const [settingsWorkerName,setSettingsWorkerName]=useState("");const [workerSettingsMessage,setWorkerSettingsMessage]=useState("");const [appPinAttempt,setAppPinAttempt]=useState("");const [appPinError,setAppPinError]=useState("");const [appAccessChecked,setAppAccessChecked]=useState(false);const [appUnlocked,setAppUnlocked]=useState(false);const [accessMessage,setAccessMessage]=useState("");
   const total=numericValue(totalPrice),paid=numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const automaticCutPrice=thobeSize==="كبير"?appSettings.largeCutPrice:appSettings.smallCutPrice;const availableWorkerNames=workerName&&!workerNames.includes(workerName)?[...workerNames,workerName]:workerNames;const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
+  useEffect(()=>{
+    if(previewTarget!=="measurements")return;
+    const onPrintShortcut=(event:globalThis.KeyboardEvent)=>{
+      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="p"){
+        event.preventDefault();
+        event.stopPropagation();
+        printSheet("measurements");
+      }
+    };
+    window.addEventListener("keydown",onPrintShortcut,true);
+    return()=>window.removeEventListener("keydown",onPrintShortcut,true);
+  },[previewTarget]);
+
 
   async function load(){try{setError("");const [dashboard,current,board]=await Promise.all([invoke<Dashboard>("dashboard_summary"),invoke<CurrentSession>("current_session"),invoke<WorkBoardItem[]>("work_board")]);setData(dashboard);setSession(current);setWorkItems(board)}catch{setError("تعذر قراءة بيانات المحل المحلية.")}}
   async function loadDesignOptions(){try{setDesignOptions(await invoke<DesignOption[]>("list_design_options"))}catch{setSettingsError("تعذر قراءة مكتبة الأشكال.")}}
@@ -287,7 +300,66 @@ export default function App(){
     }catch(error){setStorageMessage(String(error))}finally{setStorageBusy(false)}
   }
   async function deleteDesignOption(id:number){try{await invoke("delete_design_option",{id});setSelectedDesigns(current=>Object.fromEntries(Object.entries(current).filter(([,option])=>option?.id!==id)));await loadDesignOptions()}catch{setSettingsError("تعذر حذف النوع.")}}
+  async function printMeasurementSheets(){
+    const source=document.querySelector<HTMLElement>(".measurement-print-stack");
+    if(!source?.querySelector(".measurement-paper"))return;
+    const frame=document.createElement("iframe");
+    frame.title="طباعة مقاسات الخياط";
+    frame.style.cssText="position:fixed;left:-10000px;top:0;width:210mm;height:148mm;border:0;opacity:0;pointer-events:none";
+    document.body.appendChild(frame);
+    const printDocument=frame.contentDocument;
+    const printWindow=frame.contentWindow;
+    if(!printDocument||!printWindow){frame.remove();return}
+
+    printDocument.open();
+    printDocument.write('<!doctype html><html lang="ar"><head><meta charset="UTF-8"></head><body></body></html>');
+    printDocument.close();
+    const base=printDocument.createElement("base");
+    base.href=document.baseURI;
+    printDocument.head.appendChild(base);
+    const styleLoads:Promise<void>[]=[];
+    document.head.querySelectorAll('style,link[rel="stylesheet"]').forEach(node=>{
+      const copy=node.cloneNode(true) as HTMLElement;
+      if(copy instanceof HTMLLinkElement){
+        styleLoads.push(new Promise(resolve=>{
+          const done=()=>resolve();
+          copy.addEventListener("load",done,{once:true});
+          copy.addEventListener("error",done,{once:true});
+          window.setTimeout(done,3000);
+        }));
+      }
+      printDocument.head.appendChild(copy);
+    });
+    const printRules=printDocument.createElement("style");
+    printRules.textContent=`@page{size:210mm 148mm;margin:0}
+      @media print{
+        html,body{width:210mm!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
+        .app-shell{width:210mm!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
+        .print-area{display:block!important}
+        .measurement-print-stack{width:210mm!important;margin:0!important;padding:0!important}
+        .measurement-paper{display:block!important;page:auto!important;width:208mm!important;height:146mm!important;min-height:146mm!important;max-height:146mm!important;margin:0 auto!important;padding:3mm 4mm!important;break-inside:avoid!important}
+        .measurement-paper .paper-work-grid{height:108mm!important}
+        .measurement-print-stack .measurement-paper:not(:last-child){break-after:page!important}
+      }`;
+    printDocument.head.appendChild(printRules);
+    printDocument.body.dataset.printTarget="measurements";
+    const main=printDocument.createElement("main");
+    main.className="app-shell";
+    const area=printDocument.createElement("div");
+    area.className="print-area";
+    area.appendChild(source.cloneNode(true));
+    main.appendChild(area);
+    printDocument.body.appendChild(main);
+    setPreviewTarget(null);
+    await Promise.all(styleLoads);
+    await Promise.all(Array.from(printDocument.images).map(image=>image.decode().catch(()=>{})));
+    if(!frame.isConnected)return;
+    const finish=()=>{printWindow.removeEventListener("afterprint",finish);frame.remove()};
+    printWindow.addEventListener("afterprint",finish,{once:true});
+    try{printWindow.focus();printWindow.print()}catch{finish()}
+  }
   function printSheet(target:PrintTarget){
+    if(target==="measurements"){void printMeasurementSheets();return}
     document.body.dataset.printTarget=target;
     const finishPrinting=()=>{delete document.body.dataset.printTarget;window.removeEventListener("afterprint",finishPrinting)};
     window.addEventListener("afterprint",finishPrinting,{once:true});
