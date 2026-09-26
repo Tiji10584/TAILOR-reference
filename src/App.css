@@ -87,8 +87,8 @@ button{font:inherit}
 .preview-dialog{width:min(1120px,98vw);max-height:94vh;overflow:auto;padding:18px;border:1px solid #526d64;border-radius:22px;background:#182b25}.preview-dialog.thermal-dialog{width:min(560px,98vw)}.preview-tools{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:8px;color:#fff;border-radius:12px;background:#182b25ee}.preview-tools button{padding:8px 13px;border:1px solid #557066;border-radius:9px;color:#fff;background:#203b32;cursor:pointer}.preview-tools button:first-of-type{margin-right:auto;border-color:#62676b;color:#17231f;background:#62676b}.preview-sheets{display:grid;gap:18px}.thermal-preview{justify-items:center}.thermal-preview .receipt-paper{box-shadow:0 16px 45px #0006}.paper{color:#151a18;background:#fff}.measurement-paper{width:210mm;height:148mm;min-height:148mm;max-height:148mm;overflow:hidden;margin:auto;padding:5mm 6mm;font-family:Tahoma,"Segoe UI",Arial,sans-serif}.measurement-paper header{height:13mm;display:flex;justify-content:space-between;align-items:center;padding-bottom:2mm;border-bottom:2px solid #5d6266}.measurement-paper header div{display:grid;gap:.6mm}.measurement-paper header div:last-child{text-align:left}.measurement-paper header b{font-size:15px}.measurement-paper header strong{font-size:13px}.measurement-paper header small{font-size:8px;color:#666}.paper-customer{height:13mm;display:grid;grid-template-columns:1.4fr .8fr 1.2fr .65fr 1fr .7fr;align-items:center;gap:1mm;margin-top:2mm;padding:1.5mm 2mm;border:1px solid #d8ccb6;background:#f5f0e6;font-size:9px}.paper-customer span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.paper-work-grid{height:105mm;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2mm;margin-top:2mm}.paper-work-card{min-width:0;overflow:hidden;border:1px solid #73787c;background:#fff}.paper-work-card>h3{height:8mm;display:grid;place-items:center;margin:0;color:#fff;background:#4f5458;font-size:11px}.paper-feature-photo{height:33mm;display:grid;grid-template-rows:1fr 6mm;margin:0;padding:1.3mm;border-bottom:1px solid #cfc5b3;background:#f7f4ed}.paper-feature-photo img,.paper-feature-photo>span{width:100%;height:100%;min-height:0;object-fit:contain;display:grid;place-items:center;color:#777;background:#fff;font-size:8px}.paper-feature-photo figcaption{overflow:hidden;display:grid;place-items:center;font-size:9px;font-weight:700;white-space:nowrap;text-overflow:ellipsis}.paper-values{padding:1mm 1.4mm}.paper-values p{min-height:6.5mm;display:flex;align-items:center;justify-content:space-between;gap:1.5mm;margin:0;border-bottom:1px solid #ded8cc;font-size:9px}.paper-values p:last-child{border-bottom:0}.paper-values span{line-height:1.35}.paper-values b{flex:0 0 auto;font-size:9px}.paper-double-photo{height:39mm;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #cfc5b3}.paper-double-photo .paper-feature-photo{height:39mm;border-bottom:0}.paper-double-photo .paper-feature-photo:first-child{border-left:1px solid #cfc5b3}.paper-note{align-items:flex-start!important;min-height:12mm!important;padding-top:1mm}.paper-note b{max-width:70%;white-space:normal}.receipt-paper{width:76mm;margin:auto;padding:4mm;font:11px Tahoma,Arial,sans-serif;text-align:center}.receipt-paper h2{margin:0;font-size:20px}.receipt-paper>p{margin:1.5mm 0}.receipt-paper>div{display:flex;justify-content:space-between;gap:4mm;padding:2mm 0}.receipt-paper hr{border:0;border-top:1px dashed #333}.receipt-total{font-size:15px}.receipt-thobes{display:grid;gap:1mm;text-align:right}.receipt-thobes p{display:grid;grid-template-columns:auto 1fr;gap:3mm;margin:0;padding:1.5mm 0;border-bottom:1px dotted #aaa}.receipt-thobes p:last-child{border-bottom:0}.receipt-thobes span:last-child{text-align:left}.laundry-note{padding:1mm 0;text-align:right;line-height:1.7}.print-area{display:none}
 
 @media print{
-  @page measurements{size:210mm 148mm;margin:0}@page receipt{size:80mm auto;margin:0}
-  html,body,#root{height:auto!important;overflow:visible!important;background:#fff!important}.app-shell{padding:0!important}.app-shell>*:not(.print-area){display:none!important}.print-area{display:block!important}.print-area .paper{display:none}.measurement-paper,.a5-financial-sheet{page:measurements;width:210mm!important;height:148mm!important;min-height:148mm!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.measurement-print-stack .measurement-paper:not(:last-child){break-after:page;page-break-after:always}.receipt-paper{page:receipt}.laundry-print-stack .laundry-receipt:not(:last-child){break-after:page;page-break-after:always}body[data-print-target="measurements"] .print-area .measurement-paper{display:block}body[data-print-target="receipt"] .print-area .customer-receipt{display:block}body[data-print-target="laundry"] .print-area .laundry-receipt{display:block}body[data-print-target="extra"] .print-area .extra-receipt{display:block}body[data-print-target="report"] .print-area .report-print-sheet{display:block}body[data-print-target="supplier"] .print-area .supplier-payment-sheet{display:block}
+  @page{size:210mm 297mm;margin:0}
+  html,body,#root{height:auto!important;overflow:visible!important;background:#fff!important}.app-shell{padding:0!important}.app-shell>*:not(.print-area){display:none!important}.print-area{display:block!important}.print-area .paper{display:none}.measurement-paper,.a5-financial-sheet{page:auto;width:210mm!important;height:148mm!important;min-height:148mm!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.measurement-print-stack .measurement-paper:not(:last-child){break-after:page;page-break-after:always}.receipt-paper{page:auto}.laundry-print-stack .laundry-receipt:not(:last-child){break-after:page;page-break-after:always}body[data-print-target="measurements"] .print-area .measurement-paper{display:block}body[data-print-target="receipt"] .print-area .customer-receipt{display:block}body[data-print-target="laundry"] .print-area .laundry-receipt{display:block}body[data-print-target="extra"] .print-area .extra-receipt{display:block}body[data-print-target="report"] .print-area .report-print-sheet{display:block}body[data-print-target="supplier"] .print-area .supplier-payment-sheet{display:block}
 }
 
 @media(min-width:761px){
@@ -4524,7 +4524,7 @@ button{font:inherit}
 
 @media print{
   .measurement-paper{
-    page:measurements;
+    page:auto;
     width:210mm!important;
     height:148mm!important;
     min-height:148mm!important;
@@ -4560,7 +4560,7 @@ body[data-print-target="report"] .print-area .report-print-sheet,
 body[data-print-target="supplier"] .print-area .supplier-payment-sheet,
 body[data-print-target="finance"] .print-area .financial-entry-sheet{display:block!important}
 
-@page measurements{size:210mm 148mm;margin:0}
+
 
 
 /* فسحة صغيرة تمنع إنشاء صفحة فارغة بسبب تقريب أبعاد A5 في WebView2 */
@@ -4650,13 +4650,6 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .app-shell .worker-payroll-empty{margin:0;padding:15px;color:var(--muted)}
 @media(max-width:1020px){.app-shell .worker-payroll-layout{grid-template-columns:1fr}.app-shell .worker-account-totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.app-shell .finance-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}.app-shell .finance-metrics>article{min-height:140px;aspect-ratio:1/1}.app-shell .worker-payroll-header,.app-shell .worker-account>header{flex-direction:column;align-items:stretch}.app-shell .worker-form-pair{grid-template-columns:1fr}}
-@page supplierHalf{size:210mm 297mm;margin:0}
-@media print{
- body[data-print-target="supplier"] .print-area .supplier-payment-sheet{
-  page:supplierHalf;width:210mm!important;height:147mm!important;min-height:147mm!important;max-height:147mm!important;
-  margin:0!important;padding:8mm 10mm!important;border:0!important;border-radius:0!important;overflow:hidden!important;break-inside:avoid!important;
- }
-}
 
 .app-shell .finance-card-grid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;overflow:visible}
 .app-shell .finance-card-grid>article{min-width:0!important;min-height:158px;display:grid!important;grid-template-columns:1fr!important;grid-template-rows:auto 1fr auto;gap:10px;padding:14px!important;border:1px solid var(--line)!important;border-radius:12px;color:var(--text);background:var(--surface)!important}
@@ -4665,3 +4658,29 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .app-shell .finance-card-grid time,.app-shell .finance-card-grid small{font-size:.75rem;color:var(--muted)}
 .app-shell .finance-card-grid p{margin:0;overflow-wrap:anywhere;font-size:.85rem}
 .app-shell .finance-card-grid strong{white-space:nowrap}
+
+
+/* All printable documents occupy the landscape A5 area at the top of portrait A4. */
+.customer-receipt-stack,.half-a4-preview{display:grid;justify-items:center;gap:18px}
+.receipt-paper{
+  width:208mm;height:146mm;min-height:146mm;max-height:146mm;
+  overflow:hidden;margin:auto;padding:5mm 7mm;
+  font:12px Tahoma,"Segoe UI",Arial,sans-serif;
+  text-align:right;overflow-wrap:anywhere;
+}
+.receipt-paper>h2,.receipt-paper>p{text-align:center}
+.receipt-paper>div{display:grid;grid-template-columns:1fr auto;gap:2mm;margin:1mm 0;padding:1mm 2mm;border:1px solid #777;border-radius:3px}
+.receipt-paper>hr{margin:2mm 0}
+.receipt-thobes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1mm 2mm}
+.receipt-thobes>p{display:grid;grid-template-columns:auto 1fr;gap:2mm;margin:0;padding:1mm 2mm;border:1px solid #777}
+.receipt-thobes>p>span{text-align:right}
+.preview-dialog .receipt-paper>div{gap:2mm!important;margin:1mm 0!important;padding:1mm 2mm!important}
+.preview-dialog .receipt-paper>hr{margin:2mm 0!important}
+.preview-dialog .receipt-thobes{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:1mm 2mm!important;margin:0!important}
+.preview-dialog .receipt-thobes>p{display:grid!important;grid-template-columns:auto 1fr!important;gap:2mm!important;margin:0!important;padding:1mm 2mm!important}
+.preview-dialog .receipt-thobes>p>b{display:inline!important;margin:0!important}
+.preview-dialog .receipt-thobes>p>span{text-align:right!important;line-height:1.3!important}
+.preview-dialog .receipt-paper>small{margin-top:2mm!important;padding-top:0!important}
+@media(max-width:760px){.preview-dialog .receipt-paper{transform:scale(.65);transform-origin:top center;margin-bottom:-50mm}}
+
+.preview-overlay{z-index:50}
