@@ -42,8 +42,13 @@ async fn print_direct(window:tauri::WebviewWindow,thermal:bool,page_height_mm:f6
  window.with_webview(move |webview|{
   let result=(||->Result<(),String>{
    let core=unsafe{webview.controller().CoreWebView2()}.map_err(|e|e.to_string())?;
+   // Wry and this print module may use different windows-core versions.
+   // Both COM wrappers own one pointer; moving it to IUnknown transfers that
+   // ownership so QueryInterface uses the same windows-core as webview2-com.
+   let core:windows::core::IUnknown=unsafe{std::mem::transmute(core)};
    let printer:ICoreWebView2_16=core.cast().map_err(|e|format!("واجهة الطباعة غير متاحة: {e}"))?;
-   let environment:ICoreWebView2Environment6=webview.environment().cast().map_err(|e|e.to_string())?;
+   let environment:windows::core::IUnknown=unsafe{std::mem::transmute(webview.environment())};
+   let environment:ICoreWebView2Environment6=environment.cast().map_err(|e|e.to_string())?;
    let settings=unsafe{environment.CreatePrintSettings()}.map_err(|e|e.to_string())?;
    let media:ICoreWebView2PrintSettings2=settings.cast().map_err(|e|format!("إعداد حجم الورق غير متاح: {e}"))?;
    unsafe{

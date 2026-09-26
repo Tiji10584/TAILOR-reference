@@ -696,13 +696,18 @@ export default function App(){
         </section>
 
         <section className="settings-control-card settings-storage-panel">
-          <div className="settings-card-icon">04</div>
-          <div className="settings-section-heading"><div><span>التخزين</span><h2>قاعدة بيانات المحل</h2></div><em>{storage?.isCustom?"مكان مخصص":"المكان الافتراضي"}</em></div>
-          <div className="settings-storage-body">
-            <div className="settings-path-card"><small>المجلد المستخدم</small><b dir="ltr">{storage?.folder||"جارٍ قراءة المكان…"}</b><small>ملف البيانات</small><span dir="ltr">{storage?.databasePath||"—"}</span></div>
-            <div className="settings-storage-actions"><button className="settings-primary" type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("copy")}>{storageBusy?"جارٍ تغيير المكان…":"تغيير مكان الحفظ"}</button><button type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("use")}>ربط مجلد بيانات موجود</button></div>
+          <div className="settings-storage-header">
+            <div className="settings-storage-title"><div className="settings-card-icon">04</div><div><span>التخزين</span><h2>قاعدة بيانات المحل</h2></div></div>
+            <em className="settings-storage-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 11h18"/></svg>{storage?.isCustom?"مكان مخصص":"المكان الافتراضي"}</em>
           </div>
-          {currentCustomer&&<p className="settings-alert">اخرج من فاتورة العميل أولًا قبل تغيير مكان قاعدة البيانات.</p>}{storageMessage&&<p className="settings-message">{storageMessage}</p>}
+          <div className="settings-storage-body">
+            <div className="settings-path-card">
+              <div className="settings-path-row"><span className="settings-path-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 11h18"/></svg>المجلد</span><b className="settings-path-value" dir="ltr" title={storage?.folder||undefined}>{storage?.folder||"جارٍ قراءة المكان…"}</b></div>
+              <div className="settings-path-row"><span className="settings-path-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v6h5M8 13h8M8 17h8"/></svg>البيانات</span><span className="settings-path-value" dir="ltr" title={storage?.databasePath||undefined}>{storage?.databasePath||"—"}</span></div>
+            </div>
+            <div className="settings-storage-actions"><button className="settings-primary" type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("copy")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 11h18"/></svg>{storageBusy?"جارٍ تغيير المكان…":"تغيير مكان الحفظ"}</button><button type="button" disabled={storageBusy||Boolean(currentCustomer)} onClick={()=>void chooseStorage("use")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>ربط مجلد بيانات موجود</button></div>
+          </div>
+          {currentCustomer&&<p className="settings-alert"><span aria-hidden="true">!</span>اخرج من فاتورة العميل أولًا قبل تغيير مكان قاعدة البيانات.</p>}{storageMessage&&<p className="settings-message">{storageMessage}</p>}
         </section>
         <section className="settings-control-card settings-printers-card">
           <div className="settings-card-icon">05</div>
