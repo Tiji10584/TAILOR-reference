@@ -4709,3 +4709,68 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .worker-delete-dialog button:disabled{opacity:.6;cursor:wait}
 @media(max-width:620px){.app-shell .finance-hub-grid{gap:10px}.app-shell .finance-hub-card{gap:6px;padding:12px;border-radius:12px}.app-shell .finance-hub-icon{width:32px;height:32px;font-size:18px}.app-shell .finance-hub-card strong{font-size:1rem}.app-shell .finance-hub-card small{font-size:.66rem;line-height:1.4}.app-shell .finance-hub-arrow{font-size:.66rem}}
 .app-shell .finance-section-note{margin:12px 0 19px;padding:10px 13px;border:1px solid var(--line);border-radius:9px;color:var(--muted);background:var(--surface-soft);font-size:.78rem;line-height:1.8}
+
+/* Fit the four finance choices inside the desktop viewport without an inner scrollbar. */
+@media(min-width:761px) and (min-height:761px){
+  .app-shell .finance-hub-page{height:calc(100dvh - 100px)!important;overflow:hidden!important;padding-bottom:10px!important}
+  .app-shell .finance-hub-page .business-head{margin-bottom:8px!important}
+  .app-shell .finance-hub-grid{width:min(640px,calc(100dvh - 260px),100%)!important;gap:12px!important;margin:12px auto 0!important}
+  .app-shell .finance-hub-card{gap:8px!important;padding:17px!important}
+}
+@media(max-height:760px){.app-shell .finance-hub-grid{width:min(510px,100%);gap:10px;margin:12px auto}.app-shell .finance-hub-card{padding:12px}}
+
+/* All five order setup controls share one row on desktop; the next row starts directly below. */
+@media(min-width:1251px){
+  .app-shell .measurement-setup-bar{grid-template-columns:minmax(0,.8fr) minmax(0,1fr) minmax(0,1.35fr) minmax(0,1.15fr) minmax(0,.9fr)!important;gap:7px!important;margin:6px 0!important}
+  .app-shell .measurement-setup-card{min-height:78px!important;gap:4px!important;padding:7px 9px!important}
+  .app-shell .measurement-setup-card .size-mode-row{min-height:18px!important}
+}
+@media(min-width:1400px) and (min-height:850px){
+  .app-shell .order-page.compact-order{padding:6px 4px 12px!important}
+  .app-shell .measure-columns{min-height:0!important;gap:8px!important;margin:6px 0!important}
+  .app-shell .measure-column{min-height:0!important;padding:8px!important}
+  .app-shell .measure-column>header{min-height:30px!important;margin-bottom:5px!important;padding-bottom:4px!important}
+  .app-shell .compact-photo{min-height:62px!important;grid-template-columns:48px minmax(0,1fr)!important;padding:5px!important}
+  .app-shell .compact-photo img,.app-shell .compact-photo>span{width:48px!important;height:48px!important}
+  .app-shell .double-photo .compact-photo{min-height:70px!important}
+  .app-shell .double-photo .compact-photo img,.app-shell .double-photo .compact-photo>span{height:44px!important}
+  .app-shell .vertical-fields{gap:4px!important}
+  .app-shell .compact-field,.app-shell .compact-select{padding:4px 6px!important}
+  .app-shell .measure-input-wrap,.app-shell .named-dual-measure,.app-shell .dual-measure{height:30px!important}
+  .app-shell .measure-input-wrap input,.app-shell .dual-measure input,.app-shell .named-dual-measure input,.app-shell .measure-unit-badge,.app-shell .named-dual-measure em{height:28px!important}
+  .app-shell .compact-select select{height:30px!important}
+  .app-shell .compact-notes textarea{min-height:48px!important}
+}
+
+.dashboard-work-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 9px}
+.dashboard-work-actions h2{margin:0;font-size:1rem}
+.dashboard-work-actions button{min-height:38px;padding:7px 13px;border:1px solid var(--line-strong);border-radius:9px;color:#fff;background:var(--accent);font:inherit;font-weight:800;cursor:pointer}
+@media(max-width:760px){.dashboard-work-actions{flex-wrap:wrap}.dashboard-work-actions button{width:100%}}
+
+/* Larger Arabic text across half-A4 print sheets, while preserving their fixed dimensions. */
+.measurement-paper header b{font-size:20px}
+.measurement-paper header strong{font-size:15px}
+.measurement-paper header small{font-size:12px}
+.measurement-paper .paper-customer{font-size:13px}
+.measurement-paper .paper-work-card>h3{font-size:16px}
+.measurement-paper .paper-values p{font-size:14px}
+.measurement-paper .paper-values p>b{font-size:16px}
+.measurement-paper .paper-values .paper-note b{font-size:13px}
+.measurement-paper .paper-feature-photo figcaption{font-size:12px}
+.measurement-paper .paper-double-photo .paper-feature-photo figcaption{font-size:11px}
+.receipt-paper{font-size:14px!important}
+.receipt-paper>h2{font-size:24px;line-height:1.25;overflow-wrap:anywhere}
+.receipt-paper>small{font-size:12px}
+.a5-financial-sheet .a5-report-grid span,.a5-financial-sheet .a5-operation-grid span,.a5-financial-sheet .supplier-payment-body span{font-size:13px}
+.a5-financial-sheet>footer{font-size:14px}
+
+/* Customer price and laundry slips use the 80 mm thermal roll. */
+.preview-dialog.thermal-dialog{width:min(425px,98vw)}
+.preview-dialog.thermal-dialog .receipt-paper{width:76mm!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important;margin:0 auto!important;margin-bottom:0!important;padding:3mm!important;transform:none!important;text-align:right!important;font-size:13px!important;line-height:1.4!important}
+.preview-dialog.thermal-dialog .receipt-paper>h2{font-size:20px!important}
+.preview-dialog.thermal-dialog .receipt-paper>div{gap:1mm!important;margin:.6mm 0!important;padding:.8mm 1mm!important}
+.preview-dialog.thermal-dialog .receipt-paper>hr{margin:1mm 0!important}
+.preview-dialog.thermal-dialog .receipt-thobes{grid-template-columns:1fr!important;gap:1mm!important}
+.preview-dialog.thermal-dialog .receipt-thobes>p{grid-template-columns:auto 1fr!important;gap:1mm!important;padding:1mm!important}
+.side-right .side-cards{grid-template-rows:repeat(6,minmax(0,1fr))}
+.side-left .side-cards{grid-template-rows:repeat(5,minmax(0,1fr))}
