@@ -287,7 +287,13 @@ export default function App(){
     }catch(error){setStorageMessage(String(error))}finally{setStorageBusy(false)}
   }
   async function deleteDesignOption(id:number){try{await invoke("delete_design_option",{id});setSelectedDesigns(current=>Object.fromEntries(Object.entries(current).filter(([,option])=>option?.id!==id)));await loadDesignOptions()}catch{setSettingsError("تعذر حذف النوع.")}}
-  function printSheet(target:PrintTarget){setPreviewTarget(null);document.body.dataset.printTarget=target;window.setTimeout(()=>{window.print();window.setTimeout(()=>delete document.body.dataset.printTarget,500)},100)}
+  function printSheet(target:PrintTarget){
+    document.body.dataset.printTarget=target;
+    const finishPrinting=()=>{delete document.body.dataset.printTarget;window.removeEventListener("afterprint",finishPrinting)};
+    window.addEventListener("afterprint",finishPrinting,{once:true});
+    setPreviewTarget(null);
+    window.setTimeout(()=>window.print(),100);
+  }
   function measurementInput(field:string){return <label className="compact-field" key={field}><span>{field}</span><div className="measure-input-wrap"><input className="numeric" disabled={orderLocked} value={measurements[field]||""} onChange={event=>setMeasurements(current=>({...current,[field]:latinDigits(event.target.value)}))} placeholder="—"/><small className="measure-unit-badge">{unit}</small></div></label>}
   function bodyLengthInput(){return <label className="compact-field body-length-field"><span>الطول</span><div className="named-dual-measure"><label><em>أمام</em><input className="numeric" disabled={orderLocked} value={measurements["طول أمام"]||""} onChange={event=>changeBodyLength("طول أمام",event.target.value)} placeholder="—"/></label><label><em>خلف</em><input className="numeric" disabled={orderLocked} value={measurements["طول خلف"]||""} onChange={event=>changeBodyLength("طول خلف",event.target.value)} placeholder="—"/></label><small className="measure-unit-badge">{unit}</small></div></label>}
   function photoPicker(category:string,label:string){const option=selectedDesigns[category];return <button className={`compact-photo ${option?"chosen":""}`} type="button" disabled={orderLocked} onClick={()=>setPickerCategory(category)}>{option?<img src={option.imageData} alt={option.name}/>:<span>＋</span>}<b>{option?.name||label}</b></button>}
