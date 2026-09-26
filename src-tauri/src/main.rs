@@ -192,7 +192,7 @@ struct FabricUsagePayload{fabric_id:i64,thobe_index:i64,meters:f64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
-struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<String>,thobe_size:String,amount:f64}
+struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<String>,thobe_size:String,amount:f64,#[serde(default)] tailor_amount:Option<f64>}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -1286,7 +1286,7 @@ fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pi
 
 #[tauri::command]
 fn save_cut_prices(app:AppHandle,large_cut_price:f64,small_cut_price:f64)->Result<AppSettings,String>{
- if !large_cut_price.is_finite()||large_cut_price<0.0||!small_cut_price.is_finite()||small_cut_price<0.0{return Err("أسعار القص يجب أن تكون أرقامًا صحيحة وغير سالبة".into())}
+ if !large_cut_price.is_finite()||large_cut_price<0.0||!small_cut_price.is_finite()||small_cut_price<0.0{return Err("أجور الخياط يجب أن تكون أرقامًا صحيحة وغير سالبة".into())}
  let conn=db(&app)?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('large_cut_price',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[large_cut_price.to_string()]).map_err(|e|e.to_string())?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('small_cut_price',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[small_cut_price.to_string()]).map_err(|e|e.to_string())?;
@@ -1600,7 +1600,8 @@ fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i
   if cut.thobe_index<0||!indexes.insert(cut.thobe_index){return Err("رقم الثوب في أجور العمال غير صحيح أو مكرر".into())}
   let size=cut.thobe_size.trim();
   if size!="كبير"&&size!="صغير"{return Err("حجم الثوب في أجر العامل غير صحيح".into())}
-  if !cut.amount.is_finite()||cut.amount<0.0{return Err("أجر القص غير صحيح".into())}
+ if !cut.amount.is_finite()||cut.amount<0.0{return Err("أجر العامل غير صحيح".into())}
+ if cut.tailor_amount.is_some_and(|amount|!amount.is_finite()||amount<0.0){return Err("أجر الخياط غير صحيح".into())}
   let worker=cut.worker_name.trim();
   if !worker.is_empty(){
    let mode:String=transaction.query_row("SELECT pay_mode FROM workers WHERE name=?1 AND role='قصاص'",[worker],|row|row.get(0)).map_err(|_|"القصاص غير موجود".to_string())?;
@@ -1629,11 +1630,10 @@ fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i
     "SELECT worker_id,thobe_size,amount FROM worker_tailor_entries WHERE invoice_id=?1 AND thobe_index=?2",
     params![invoice_id,cut.thobe_index],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
    ).optional().map_err(|e|e.to_string())?;
-   let earned=match existing{
+   let earned=if mode=="راتب"{0.0}else if let Some(custom_amount)=cut.tailor_amount{custom_amount}else{match existing{
     Some((old_id,old_size,old_amount)) if old_id==worker_id&&old_size==size=>old_amount,
-    _ if mode=="قطعة"=>if size=="كبير"{large}else{small},
-    _=>0.0
-   };
+    _=>if size=="كبير"{large}else{small}
+   }};
    transaction.execute(
     "INSERT INTO worker_tailor_entries(invoice_id,thobe_index,worker_id,thobe_size,amount,created_at)
      VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))
