@@ -4561,3 +4561,16 @@ body[data-print-target="supplier"] .print-area .supplier-payment-sheet,
 body[data-print-target="finance"] .print-area .financial-entry-sheet{display:block!important}
 
 @page measurements{size:210mm 148mm;margin:0}
+
+
+/* فسحة صغيرة تمنع إنشاء صفحة فارغة بسبب تقريب أبعاد A5 في WebView2 */
+@media print{
+  body[data-print-target="measurements"] .measurement-paper{
+    height:147mm!important;
+    min-height:147mm!important;
+    max-height:147mm!important;
+  }
+  body[data-print-target="measurements"] .measurement-paper .paper-work-grid{
+    height:107mm;
+  }
+}
