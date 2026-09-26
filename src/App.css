@@ -4684,3 +4684,28 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 @media(max-width:760px){.preview-dialog .receipt-paper{transform:scale(.65);transform-origin:top center;margin-bottom:-50mm}}
 
 .preview-overlay{z-index:50}
+
+/* Finance entry: four clear sections, matching the requested two-by-two layout. */
+.app-shell .finance-hub-grid{width:min(760px,100%);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:30px auto 50px}
+.app-shell .finance-hub-card{aspect-ratio:1/1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:24px;border:2px solid var(--line-strong);border-radius:18px;color:var(--text);background:var(--surface);text-align:right;font:inherit;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
+.app-shell .finance-hub-card:hover,.app-shell .finance-hub-card:focus-visible{border-color:var(--accent);box-shadow:0 12px 28px #0003;transform:translateY(-3px)}
+.app-shell .finance-hub-icon{width:45px;height:45px;display:grid;place-items:center;border:1px solid var(--line-strong);border-radius:12px;color:var(--accent);background:var(--surface-soft);font-size:25px}
+.app-shell .finance-hub-card strong{font-size:1.55rem;line-height:1.35}
+.app-shell .finance-hub-card small{color:var(--muted);font-size:.88rem;line-height:1.7}
+.app-shell .finance-hub-arrow{margin-top:auto;color:var(--accent);font-size:.78rem;font-weight:800}
+.app-shell .finance-section-nav{display:flex;align-items:center;gap:14px;margin:8px 0 20px;color:var(--muted)}
+.app-shell .finance-section-nav button{min-height:40px;padding:8px 13px;border:1px solid var(--line-strong);border-radius:9px;color:var(--text);background:var(--surface);font:inherit;cursor:pointer}
+.app-shell .finance-section-nav span{font-weight:800}
+.app-shell .finance-basic-form{width:min(520px,100%);margin-top:18px}
+.worker-delete-overlay{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;background:#000a}
+.worker-delete-dialog{width:min(480px,100%);padding:25px;border:1px solid var(--line-strong);border-radius:17px;color:var(--text);background:var(--surface);box-shadow:0 24px 65px #0009}
+.worker-delete-dialog h2{margin:0 0 12px;font-size:1.22rem}
+.worker-delete-dialog p{margin:0 0 20px;color:var(--muted);line-height:1.9}
+.worker-delete-dialog p strong{color:var(--text)}
+.worker-delete-dialog .worker-delete-error{color:var(--danger)}
+.worker-delete-dialog>div{display:flex;justify-content:flex-end;gap:9px}
+.worker-delete-dialog button{min-height:40px;padding:8px 14px;border:1px solid var(--line-strong);border-radius:9px;color:var(--text);background:var(--surface-soft);font:inherit;cursor:pointer}
+.worker-delete-dialog .worker-delete-confirm{border-color:var(--danger);color:#fff;background:#9b3636}
+.worker-delete-dialog button:disabled{opacity:.6;cursor:wait}
+@media(max-width:620px){.app-shell .finance-hub-grid{gap:10px}.app-shell .finance-hub-card{gap:6px;padding:12px;border-radius:12px}.app-shell .finance-hub-icon{width:32px;height:32px;font-size:18px}.app-shell .finance-hub-card strong{font-size:1rem}.app-shell .finance-hub-card small{font-size:.66rem;line-height:1.4}.app-shell .finance-hub-arrow{font-size:.66rem}}
+.app-shell .finance-section-note{margin:12px 0 19px;padding:10px 13px;border:1px solid var(--line);border-radius:9px;color:var(--muted);background:var(--surface-soft);font-size:.78rem;line-height:1.8}
