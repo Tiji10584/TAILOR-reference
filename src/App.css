@@ -4379,3 +4379,164 @@ button{font:inherit}
     grid-column:1/-1!important;
   }
 }
+
+
+/* ورقة مقاسات الخياط: نصف A4 (A5 أفقي)، بمقاسات وخط واضحين */
+.measurement-paper{
+  width:210mm;
+  height:148mm;
+  min-height:148mm;
+  max-height:148mm;
+  padding:4mm 5mm;
+  overflow:hidden;
+  font-family:Tahoma,"Segoe UI",Arial,sans-serif;
+}
+.measurement-paper header{
+  height:11mm;
+  padding-bottom:1mm;
+}
+.measurement-paper header b{font-size:17px}
+.measurement-paper header strong{font-size:14px}
+.measurement-paper header small{font-size:10px}
+.measurement-paper .paper-customer{
+  height:17mm;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.5mm 2mm;
+  margin:2mm 0 0;
+  padding:1mm 2mm;
+  font-size:12px;
+  line-height:1.15;
+}
+.measurement-paper .paper-customer span{
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.measurement-paper .paper-work-grid{
+  height:108mm;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-template-rows:repeat(2,minmax(0,1fr));
+  gap:2mm;
+  margin-top:2mm;
+}
+.measurement-paper .paper-work-card{
+  min-width:0;
+  min-height:0;
+  display:grid;
+  grid-template-columns:27mm minmax(0,1fr);
+  grid-template-rows:7.5mm minmax(0,1fr);
+  overflow:hidden;
+}
+.measurement-paper .paper-work-card>h3{
+  grid-column:1/-1;
+  grid-row:1;
+  height:7.5mm;
+  padding:0;
+  font-size:14px;
+}
+.measurement-paper .paper-feature-photo,
+.measurement-paper .paper-double-photo{
+  grid-column:1;
+  grid-row:2;
+  width:27mm;
+  height:100%;
+  min-height:0;
+}
+.measurement-paper .paper-feature-photo{
+  grid-template-rows:minmax(0,1fr) 6mm;
+  padding:1mm;
+  border-bottom:0;
+  border-left:1px solid #777;
+}
+.measurement-paper .paper-feature-photo figcaption{
+  font-size:10px;
+}
+.measurement-paper .paper-double-photo{
+  grid-template-columns:1fr;
+  grid-template-rows:repeat(2,minmax(0,1fr));
+  border-bottom:0;
+  border-left:1px solid #777;
+}
+.measurement-paper .paper-double-photo .paper-feature-photo{
+  width:100%;
+  height:100%;
+  border:0;
+}
+.measurement-paper .paper-double-photo .paper-feature-photo:first-child{
+  border-left:0;
+  border-bottom:1px solid #777;
+}
+.measurement-paper .paper-double-photo .paper-feature-photo figcaption{
+  font-size:9px;
+  height:5mm;
+}
+.measurement-paper .paper-values{
+  grid-column:2;
+  grid-row:2;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  padding:0 1.5mm;
+}
+.measurement-paper .paper-values p{
+  min-height:5.5mm;
+  gap:1mm;
+  font-size:12px;
+  line-height:1.15;
+}
+.measurement-paper .paper-values p>span{
+  min-width:0;
+}
+.measurement-paper .paper-values p>b{
+  min-width:0;
+  flex:0 1 auto;
+  font-size:14px;
+  white-space:nowrap;
+}
+.measurement-paper .paper-values .paper-note{
+  min-height:10mm!important;
+  align-items:flex-start;
+}
+.measurement-paper .paper-values .paper-note b{
+  max-width:75%;
+  font-size:11px;
+  white-space:normal;
+  line-height:1.15;
+  overflow-wrap:anywhere;
+}
+
+/* معاينة الشاشة تستخدم أبعاد الطباعة نفسها؛ قواعد المعاينة القديمة تضيف فراغات زائدة */
+.preview-dialog .measurement-paper .paper-customer{
+  gap:.5mm 2mm!important;
+  margin:2mm 0 0!important;
+  padding:1mm 2mm!important;
+}
+.preview-dialog .measurement-paper .paper-work-grid{gap:2mm!important}
+.preview-dialog .measurement-paper .paper-work-card>h3{padding:0!important}
+.preview-dialog .measurement-paper .paper-values{padding:0 1.5mm!important}
+.preview-dialog .measurement-paper .paper-values>p{
+  padding:0!important;
+  min-height:5.5mm!important;
+}
+
+@media print{
+  .measurement-paper{
+    page:measurements;
+    width:210mm!important;
+    height:148mm!important;
+    min-height:148mm!important;
+    max-height:148mm!important;
+    margin:0!important;
+    border:0!important;
+    border-radius:0!important;
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+  .measurement-paper .paper-work-card>h3{
+    color:#fff!important;
+    background:#000!important;
+  }
+}
