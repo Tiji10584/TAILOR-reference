@@ -4540,3 +4540,24 @@ button{font:inherit}
     background:#000!important;
   }
 }
+
+
+/* إبقاء ورقة الطباعة وحدها ظاهرة طوال فتح معاينة Windows، حتى لو تأخر حساب الصفحات */
+body[data-print-target] .app-shell{
+  height:auto!important;
+  min-height:0!important;
+  overflow:visible!important;
+  padding:0!important;
+}
+body[data-print-target] .app-shell>*:not(.print-area){display:none!important}
+body[data-print-target] .print-area{display:block!important}
+body[data-print-target] .print-area .paper{display:none!important}
+body[data-print-target="measurements"] .print-area .measurement-paper,
+body[data-print-target="receipt"] .print-area .customer-receipt,
+body[data-print-target="laundry"] .print-area .laundry-receipt,
+body[data-print-target="extra"] .print-area .extra-receipt,
+body[data-print-target="report"] .print-area .report-print-sheet,
+body[data-print-target="supplier"] .print-area .supplier-payment-sheet,
+body[data-print-target="finance"] .print-area .financial-entry-sheet{display:block!important}
+
+@page measurements{size:210mm 148mm;margin:0}
