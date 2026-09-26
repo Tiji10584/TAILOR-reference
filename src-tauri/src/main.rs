@@ -3,6 +3,90 @@ use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
 
+#[cfg(windows)]
+#[tauri::command]
+fn list_printers()->Result<Vec<String>,String>{
+ use windows::{core::PCWSTR,Win32::Graphics::Printing::{EnumPrintersW,PRINTER_ENUM_LOCAL,PRINTER_ENUM_CONNECTIONS,PRINTER_INFO_4W}};
+ let flags=PRINTER_ENUM_LOCAL|PRINTER_ENUM_CONNECTIONS;
+ let (mut needed,mut count)=(0,0);
+ let _=unsafe{EnumPrintersW(flags,PCWSTR::null(),4,None,&mut needed,&mut count)};
+ if needed==0{return Ok(Vec::new())}
+ if needed>1024*1024{return Err("قائمة الطابعات كبيرة جدًا".into())}
+ let mut buffer=vec![0u8;needed as usize];
+ unsafe{EnumPrintersW(flags,PCWSTR::null(),4,Some(&mut buffer),&mut needed,&mut count)}.map_err(|e|e.to_string())?;
+ let mut names=Vec::new();
+ for index in 0..count as usize{
+  let offset=index*std::mem::size_of::<PRINTER_INFO_4W>();
+  if offset+std::mem::size_of::<PRINTER_INFO_4W>()>buffer.len(){break}
+  let info=unsafe{(buffer.as_ptr().add(offset) as *const PRINTER_INFO_4W).read_unaligned()};
+  let name=unsafe{info.pPrinterName.to_string()}.map_err(|e|e.to_string())?;
+  if !name.is_empty(){names.push(name)}
+ }
+ names.sort();names.dedup();Ok(names)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn list_printers()->Result<Vec<String>,String>{Ok(Vec::new())}
+
+// WebView2 prints the current page directly to the Windows default printer.
+// The frontend selects exactly one document with print CSS before invoking this command.
+#[cfg(windows)]
+#[tauri::command]
+async fn print_direct(window:tauri::WebviewWindow,thermal:bool,page_height_mm:f64,printer_name:String)->Result<(),String>{
+ use std::{sync::mpsc,time::Duration};
+ use webview2_com::{Microsoft::Web::WebView2::Win32::*,PrintCompletedHandler};
+ use windows::core::Interface;
+ if !page_height_mm.is_finite()||!(70.0..=1500.0).contains(&page_height_mm){return Err("مقاس الورق غير صالح".into())}
+ let (tx,rx)=mpsc::channel::<Result<(),String>>();
+ window.with_webview(move |webview|{
+  let result=(||->Result<(),String>{
+   let core=unsafe{webview.controller().CoreWebView2()}.map_err(|e|e.to_string())?;
+   let printer:ICoreWebView2_16=core.cast().map_err(|e|format!("واجهة الطباعة غير متاحة: {e}"))?;
+   let environment:ICoreWebView2Environment6=webview.environment().cast().map_err(|e|e.to_string())?;
+   let settings=unsafe{environment.CreatePrintSettings()}.map_err(|e|e.to_string())?;
+   let media:ICoreWebView2PrintSettings2=settings.cast().map_err(|e|format!("إعداد حجم الورق غير متاح: {e}"))?;
+   unsafe{
+    media.SetMediaSize(COREWEBVIEW2_PRINT_MEDIA_SIZE_CUSTOM).map_err(|e|e.to_string())?;
+    settings.SetPageWidth(if thermal{80.0/25.4}else{210.0/25.4}).map_err(|e|e.to_string())?;
+    settings.SetPageHeight(page_height_mm/25.4).map_err(|e|e.to_string())?;
+    settings.SetMarginTop(0.0).map_err(|e|e.to_string())?;
+    settings.SetMarginBottom(0.0).map_err(|e|e.to_string())?;
+    settings.SetMarginLeft(0.0).map_err(|e|e.to_string())?;
+    settings.SetMarginRight(0.0).map_err(|e|e.to_string())?;
+    settings.SetShouldPrintHeaderAndFooter(false).map_err(|e|e.to_string())?;
+    settings.SetScaleFactor(1.0).map_err(|e|e.to_string())?;
+    if !printer_name.is_empty(){
+     let wide:Vec<u16>=printer_name.encode_utf16().chain(std::iter::once(0)).collect();
+     media.SetPrinterName(windows::core::PCWSTR::from_raw(wide.as_ptr())).map_err(|e|e.to_string())?;
+    }
+   }
+   let completed_tx=tx.clone();
+   let completed=PrintCompletedHandler::create(Box::new(move |operation,status|{
+    let result=match operation{
+     Err(error)=>Err(error.to_string()),
+     Ok(()) if status==COREWEBVIEW2_PRINT_STATUS_SUCCEEDED=>Ok(()),
+     Ok(()) if status==COREWEBVIEW2_PRINT_STATUS_PRINTER_UNAVAILABLE=>Err("الطابعة الافتراضية غير متاحة أو غير متصلة".into()),
+     Ok(())=>Err("فشلت الطباعة على الطابعة الافتراضية".into()),
+    };
+    let _=completed_tx.send(result);
+    Ok(())
+   }));
+   unsafe{printer.Print(&settings,&completed)}.map_err(|e|e.to_string())?;
+   Ok(())
+  })();
+  if let Err(error)=result{let _=tx.send(Err(error));}
+ }).map_err(|e|e.to_string())?;
+ tauri::async_runtime::spawn_blocking(move ||rx.recv_timeout(Duration::from_secs(60)))
+  .await.map_err(|e|e.to_string())?.map_err(|_|"انتهت مهلة انتظار الطابعة".to_string())?
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn print_direct(_window:tauri::WebviewWindow,_thermal:bool,_page_height_mm:f64,_printer_name:String)->Result<(),String>{
+ Err("الطباعة المباشرة متاحة على Windows فقط".into())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct Dashboard{received_today:i64,tailored_today:i64,ready_to_deliver:i64}
@@ -1637,7 +1721,7 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(tauri::generate_handler![print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }

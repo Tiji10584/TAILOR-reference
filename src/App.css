@@ -4774,3 +4774,86 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .preview-dialog.thermal-dialog .receipt-thobes>p{grid-template-columns:auto 1fr!important;gap:1mm!important;padding:1mm!important}
 .side-right .side-cards{grid-template-rows:repeat(6,minmax(0,1fr))}
 .side-left .side-cards{grid-template-rows:repeat(5,minmax(0,1fr))}
+
+/* Keep the dashboard's work board in its own grid row. */
+.side-right .side-cards{grid-template-rows:repeat(5,minmax(0,1fr))}
+.app-shell{font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+.side-label{font-size:14px}
+.nav-card>span:last-of-type{font-size:15px;line-height:1.35}
+.greeting>span,.greeting p,.greeting time{font-size:14px}
+.metric-card p{font-size:15px}
+.work-board-column h2{font-size:14px}
+.work-board-column header>b{font-size:13px}
+.work-board-search input{font:600 13px "Segoe UI",Tahoma,Arial,sans-serif}
+.work-board-item strong{font-size:14px}
+.work-board-item small{font-size:11px}
+.dashboard-work-actions{min-height:40px;margin:0}
+.dashboard-work-actions h2{font-size:17px}
+@media(min-width:761px){
+ .dashboard{grid-template-rows:96px 96px 42px minmax(0,1fr)}
+ .work-board{height:100%;min-height:0}
+}
+@media(min-width:761px) and (max-width:1250px){
+ .dashboard{grid-template-rows:96px 96px 42px minmax(0,1fr)}
+ .nav-card>span:last-of-type{font-size:13px}
+}
+
+/* Each financial sheet uses the whole upper half of an A4 page. */
+.a5-financial-sheet{display:flex;flex-direction:column}
+.a5-financial-sheet>footer{margin-top:auto}
+.supplier-payment-body{flex:1;grid-template-rows:repeat(2,minmax(0,1fr));margin:5mm 0 3mm}
+.supplier-payment-body p{min-height:0}
+.supplier-payment-body span{font-size:15px}
+.supplier-payment-body b{font-size:20px}
+.a5-financial-sheet>footer{font-size:15px}
+.settings-printers-card{align-content:start!important;gap:12px!important}
+.settings-printer-fields{grid-column:1/-1;display:grid;gap:14px}
+.settings-printer-fields label{display:grid;gap:7px;color:var(--text);font-size:14px;font-weight:700}
+.settings-printer-fields select{width:100%;min-width:0;height:44px;padding:0 12px;border:1px solid var(--line-strong);border-radius:9px;color:var(--text);background:var(--surface-soft);font:inherit}
+
+/* WebView2's silent printer prints the main webview, so select one sheet for it. */
+@media print{
+ html[data-print-target] body,html[data-print-target] #root{width:210mm!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:0!important}
+ html[data-print-target] .app-shell{width:210mm!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:0!important}
+ html[data-print-target] .app-shell>*:not(.print-area){display:none!important}
+ html[data-print-target] .print-area{display:block!important;width:210mm!important;margin:0!important;padding:0!important}
+ html[data-print-target] .print-area>*{display:none!important}
+ html[data-print-target="measurements"] .print-area>.measurement-print-stack,
+ html[data-print-target="receipt"] .print-area>.customer-receipt-stack,
+ html[data-print-target="laundry"] .print-area>.laundry-print-stack,
+ html[data-print-target="extra"] .print-area>.extra-receipt,
+ html[data-print-target="report"] .print-area>.report-print-sheet,
+ html[data-print-target="supplier"] .print-area>.supplier-payment-sheet,
+ html[data-print-target="supply"] .print-area>.supply-entry-sheet,
+ html[data-print-target="finance"] .print-area>.financial-entry-sheet{display:block!important}
+ html[data-print-target] .print-area .paper{display:none!important}
+ html[data-print-target="measurements"] .print-area .measurement-paper,
+ html[data-print-target="receipt"] .print-area .customer-receipt,
+ html[data-print-target="laundry"] .print-area .laundry-receipt{display:block!important}
+ html[data-print-target="extra"] .print-area>.extra-receipt,
+ html[data-print-target="report"] .print-area>.report-print-sheet,
+ html[data-print-target="supplier"] .print-area>.supplier-payment-sheet,
+ html[data-print-target="supply"] .print-area>.supply-entry-sheet,
+ html[data-print-target="finance"] .print-area>.financial-entry-sheet{display:flex!important}
+ html[data-print-target] .print-area .paper{width:210mm!important;height:147mm!important;min-height:147mm!important;max-height:147mm!important;margin:0!important;padding:5mm 7mm!important;overflow:hidden!important;border:0!important;border-radius:0!important;box-shadow:none!important;transform:none!important;break-inside:avoid!important;page-break-inside:avoid!important}
+ html[data-print-target="measurements"] .print-area .measurement-paper{padding:3mm 4mm!important}
+ html[data-print-target="measurements"] .print-area .paper-work-grid{height:107mm!important}
+ html[data-print-target] .print-area .a5-financial-sheet{flex-direction:column!important}
+ html[data-print-target] .print-area .a5-financial-sheet>footer{margin-top:auto!important;font-size:16px!important}
+ html[data-print-target] .print-area .supplier-payment-body{flex:1!important;grid-template-rows:repeat(2,minmax(0,1fr))!important;margin:4mm 0 2mm!important}
+ html[data-print-target] .print-area .supplier-payment-body p{min-height:0!important}
+ html[data-print-target] .print-area .supplier-payment-body span{font-size:16px!important}
+ html[data-print-target] .print-area .supplier-payment-body b{font-size:21px!important}
+ html[data-print-target] .print-area .a5-financial-sheet header h2{font-size:29px!important}
+ html[data-print-target] .print-area .a5-report-grid span,html[data-print-target] .print-area .a5-operation-grid span{font-size:15px!important}
+ html[data-print-target="measurements"] .print-area .measurement-paper:not(:last-child),
+ html[data-print-target="laundry"] .print-area .laundry-receipt:not(:last-child){break-after:page!important;page-break-after:always!important}
+ html[data-print-target="receipt"] body,html[data-print-target="laundry"] body,
+ html[data-print-target="receipt"] #root,html[data-print-target="laundry"] #root,
+ html[data-print-target="receipt"] .app-shell,html[data-print-target="laundry"] .app-shell,
+ html[data-print-target="receipt"] .print-area,html[data-print-target="laundry"] .print-area{width:80mm!important}
+ html[data-print-target="receipt"] .print-area .receipt-paper,html[data-print-target="laundry"] .print-area .receipt-paper{width:80mm!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;margin:0!important;padding:3mm 4mm!important;text-align:right!important;font:13px/1.5 Tahoma,"Segoe UI",Arial,sans-serif!important}
+ html[data-print-target="receipt"] .print-area .receipt-paper>div,html[data-print-target="laundry"] .print-area .receipt-paper>div{display:grid!important;grid-template-columns:1fr auto!important;gap:1mm!important;margin:.6mm 0!important;padding:.8mm 1mm!important;border:1px solid #777!important;overflow-wrap:anywhere!important}
+ html[data-print-target="receipt"] .print-area .receipt-thobes{grid-template-columns:1fr!important}
+ html[data-print-target="receipt"] .print-area .receipt-thobes>p{grid-template-columns:auto 1fr!important}
+}
