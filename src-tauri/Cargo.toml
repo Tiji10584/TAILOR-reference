@@ -1,6 +1,6 @@
 [package]
 name="tailor-workspace"
-version="0.2.1"
+version="0.2.2"
 edition="2021"
 [build-dependencies]
 tauri-build={version="2",features=[]}
@@ -16,3 +16,5 @@ base64="0.22"
 uuid={version="1",features=["v4"]}
 [target.'cfg(windows)'.dependencies]
 windows-sys={version="0.61",features=["Win32_Foundation","Win32_Security_Cryptography"]}
+webview2-com="0.39.1"
+windows={version="0.61.3",features=["Win32_Graphics_Printing"]}
