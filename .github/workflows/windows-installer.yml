@@ -24,7 +24,7 @@ jobs:
       - name: Generate Windows icon
         run: npm run icons
       - name: Test license verification and Rust commands
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --release
       - name: Build standalone Windows installer
         run: npm run tauri build
       - uses: actions/upload-artifact@v4
