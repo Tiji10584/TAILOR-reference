@@ -1,3 +1,5 @@
+#![cfg_attr(all(windows, not(debug_assertions), not(test)), windows_subsystem = "windows")]
+
 use rusqlite::{params,Connection,OptionalExtension};
 use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::Mutex};

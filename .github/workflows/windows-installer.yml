@@ -29,8 +29,27 @@ jobs:
         run: npm run build
       - name: Test license verification and Rust commands
         run: cargo test --manifest-path src-tauri/Cargo.toml --release
+      - name: Verify release opens without a console window
+        shell: pwsh
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml --release
+          if ($LASTEXITCODE -ne 0) { throw 'Windows release executable failed to build.' }
+          $exe = 'src-tauri/target/release/tailor-workspace.exe'
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $exe))
+          $pe = [BitConverter]::ToInt32($bytes, 0x3c)
+          $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 24 + 68)
+          if ($subsystem -ne 2) { throw "Expected Windows GUI subsystem (2), got $subsystem." }
       - name: Build standalone Windows installer
-        run: npm run tauri build
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $success = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            npm run tauri build
+            if ($LASTEXITCODE -eq 0) { $success = $true; break }
+            if ($attempt -lt 3) { Start-Sleep -Seconds 15 }
+          }
+          if (-not $success) { throw 'Could not build the Windows installer after three attempts.' }
       - name: Verify installer and show SHA-256
         shell: pwsh
         run: |
@@ -44,10 +63,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName
-          gh release view v0.2.0 *> $null
+          gh release view v0.2.1 *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload v0.2.0 "$installer" --clobber
+            gh release upload v0.2.1 "$installer" --clobber
           } else {
-            gh release create v0.2.0 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.0' --notes 'Windows installer with offline WebView2 and per-device activation.'
+            gh release create v0.2.1 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.1' --notes 'Fix extra console window. Existing device activation and shop data remain stored in the same location.'
           }
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the installer.' }
