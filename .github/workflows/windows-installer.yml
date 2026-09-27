@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tailor-windows-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-installer:
     runs-on: windows-latest
@@ -21,8 +25,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install frontend dependencies
         run: npm install
-      - name: Generate Windows icon
-        run: npm run icons
+      - name: Build frontend and Windows icon
+        run: npm run build
       - name: Test license verification and Rust commands
         run: cargo test --manifest-path src-tauri/Cargo.toml --release
       - name: Build standalone Windows installer
