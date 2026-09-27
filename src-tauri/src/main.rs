@@ -1465,12 +1465,30 @@ fn verify_app_pin(app:AppHandle,pin:String)->Result<bool,String>{
 }
 
 #[tauri::command]
-fn admin_reset_pin(app:AppHandle,target:String,new_pin:String)->Result<AppSettings,String>{
+fn admin_reset_pin(app:AppHandle,target:String,new_pin:String,admin_code:String)->Result<AppSettings,String>{
+ let key=admin_reset_key(&target,&admin_code)?;
  let pin=new_pin.trim();
  if pin.len()<4||pin.len()>8||!pin.chars().all(|character|character.is_ascii_digit()){return Err("الرمز الجديد يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
- let key=match target.as_str(){"app"=>"app_pin","finance"=>"finance_pin",_=>return Err("نوع الرمز غير صحيح".into())};
  let conn=db(&app)?;conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES(?1,?2) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",params![key,pin]).map_err(|e|e.to_string())?;
  get_app_settings(app)
+}
+
+fn admin_reset_key(target:&str,admin_code:&str)->Result<&'static str,String>{
+ if admin_code!="ADMIN"{return Err("رمز الإدارة غير صحيح. اكتب ADMIN بالأحرف الكبيرة.".into())}
+ match target{"app"=>Ok("app_pin"),"finance"=>Ok("finance_pin"),_=>Err("نوع الرمز غير صحيح".into())}
+}
+
+#[cfg(test)]
+mod admin_pin_tests{
+ use super::admin_reset_key;
+ #[test]
+ fn reset_requires_exact_admin_code_and_targets_one_pin(){
+  assert_eq!(admin_reset_key("app","ADMIN").unwrap(),"app_pin");
+  assert_eq!(admin_reset_key("finance","ADMIN").unwrap(),"finance_pin");
+  assert!(admin_reset_key("app","admin").is_err());
+  assert!(admin_reset_key("finance","Admin").is_err());
+  assert!(admin_reset_key("both","ADMIN").is_err());
+ }
 }
 
 #[tauri::command]
