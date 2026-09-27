@@ -179,6 +179,7 @@ pub fn activated(app: &AppHandle) -> Result<bool, String> {
 pub fn license_status(app: AppHandle) -> Result<LicenseStatus, String> {
     #[cfg(debug_assertions)]
     {
+        let _ = app;
         return Ok(LicenseStatus {
             activated: true,
             device_code: "DEVELOPMENT".into(),
