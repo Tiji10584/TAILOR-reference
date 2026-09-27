@@ -1,6 +1,6 @@
 [package]
 name="tailor-workspace"
-version="0.1.0"
+version="0.2.0"
 edition="2021"
 [build-dependencies]
 tauri-build={version="2",features=[]}
@@ -10,7 +10,9 @@ tauri-plugin-dialog="2"
 tauri-build="2"
 rusqlite={version="0.32",features=["bundled"]}
 serde={version="1",features=["derive"]}
-
+serde_json="1"
+ed25519-dalek="2.2"
+base64="0.22"
+uuid={version="1",features=["v4"]}
 [target.'cfg(windows)'.dependencies]
-webview2-com="0.39.1"
-windows={version="0.62.2",features=["Win32_Graphics_Printing"]}
+windows-sys={version="0.61",features=["Win32_Foundation","Win32_Security_Cryptography"]}

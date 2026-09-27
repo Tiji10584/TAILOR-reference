@@ -2,95 +2,8 @@ use rusqlite::{params,Connection,OptionalExtension};
 use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
-
-#[cfg(windows)]
-#[tauri::command]
-fn list_printers()->Result<Vec<String>,String>{
- use windows::{core::PCWSTR,Win32::Graphics::Printing::{EnumPrintersW,PRINTER_ENUM_LOCAL,PRINTER_ENUM_CONNECTIONS,PRINTER_INFO_4W}};
- let flags=PRINTER_ENUM_LOCAL|PRINTER_ENUM_CONNECTIONS;
- let (mut needed,mut count)=(0,0);
- let _=unsafe{EnumPrintersW(flags,PCWSTR::null(),4,None,&mut needed,&mut count)};
- if needed==0{return Ok(Vec::new())}
- if needed>1024*1024{return Err("قائمة الطابعات كبيرة جدًا".into())}
- let mut buffer=vec![0u8;needed as usize];
- unsafe{EnumPrintersW(flags,PCWSTR::null(),4,Some(&mut buffer),&mut needed,&mut count)}.map_err(|e|e.to_string())?;
- let mut names=Vec::new();
- for index in 0..count as usize{
-  let offset=index*std::mem::size_of::<PRINTER_INFO_4W>();
-  if offset+std::mem::size_of::<PRINTER_INFO_4W>()>buffer.len(){break}
-  let info=unsafe{(buffer.as_ptr().add(offset) as *const PRINTER_INFO_4W).read_unaligned()};
-  let name=unsafe{info.pPrinterName.to_string()}.map_err(|e|e.to_string())?;
-  if !name.is_empty(){names.push(name)}
- }
- names.sort();names.dedup();Ok(names)
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-fn list_printers()->Result<Vec<String>,String>{Ok(Vec::new())}
-
-// WebView2 prints the current page directly to the Windows default printer.
-// The frontend selects exactly one document with print CSS before invoking this command.
-#[cfg(windows)]
-#[tauri::command]
-async fn print_direct(window:tauri::WebviewWindow,thermal:bool,page_height_mm:f64,printer_name:String)->Result<(),String>{
- use std::{sync::mpsc,time::Duration};
- use webview2_com::{Microsoft::Web::WebView2::Win32::*,PrintCompletedHandler};
- use windows::core::Interface;
- if !page_height_mm.is_finite()||!(70.0..=1500.0).contains(&page_height_mm){return Err("مقاس الورق غير صالح".into())}
- let (tx,rx)=mpsc::channel::<Result<(),String>>();
- window.with_webview(move |webview|{
-  let result=(||->Result<(),String>{
-   let core=unsafe{webview.controller().CoreWebView2()}.map_err(|e|e.to_string())?;
-   // Wry and this print module may use different windows-core versions.
-   // Both COM wrappers own one pointer; moving it to IUnknown transfers that
-   // ownership so QueryInterface uses the same windows-core as webview2-com.
-   let core:windows::core::IUnknown=unsafe{std::mem::transmute(core)};
-   let printer:ICoreWebView2_16=core.cast().map_err(|e|format!("واجهة الطباعة غير متاحة: {e}"))?;
-   let environment:windows::core::IUnknown=unsafe{std::mem::transmute(webview.environment())};
-   let environment:ICoreWebView2Environment6=environment.cast().map_err(|e|e.to_string())?;
-   let settings=unsafe{environment.CreatePrintSettings()}.map_err(|e|e.to_string())?;
-   let media:ICoreWebView2PrintSettings2=settings.cast().map_err(|e|format!("إعداد حجم الورق غير متاح: {e}"))?;
-   unsafe{
-    media.SetMediaSize(COREWEBVIEW2_PRINT_MEDIA_SIZE_CUSTOM).map_err(|e|e.to_string())?;
-    settings.SetPageWidth(if thermal{80.0/25.4}else{210.0/25.4}).map_err(|e|e.to_string())?;
-    settings.SetPageHeight(page_height_mm/25.4).map_err(|e|e.to_string())?;
-    settings.SetMarginTop(0.0).map_err(|e|e.to_string())?;
-    settings.SetMarginBottom(0.0).map_err(|e|e.to_string())?;
-    settings.SetMarginLeft(0.0).map_err(|e|e.to_string())?;
-    settings.SetMarginRight(0.0).map_err(|e|e.to_string())?;
-    settings.SetShouldPrintHeaderAndFooter(false).map_err(|e|e.to_string())?;
-    settings.SetScaleFactor(1.0).map_err(|e|e.to_string())?;
-    if !printer_name.is_empty(){
-     let wide:Vec<u16>=printer_name.encode_utf16().chain(std::iter::once(0)).collect();
-     media.SetPrinterName(windows::core::PCWSTR::from_raw(wide.as_ptr())).map_err(|e|e.to_string())?;
-    }
-   }
-   let completed_tx=tx.clone();
-   let completed=PrintCompletedHandler::create(Box::new(move |operation,status|{
-    let result=match operation{
-     Err(error)=>Err(error.to_string()),
-     Ok(()) if status==COREWEBVIEW2_PRINT_STATUS_SUCCEEDED=>Ok(()),
-     Ok(()) if status==COREWEBVIEW2_PRINT_STATUS_PRINTER_UNAVAILABLE=>Err("الطابعة الافتراضية غير متاحة أو غير متصلة".into()),
-     Ok(())=>Err("فشلت الطباعة على الطابعة الافتراضية".into()),
-    };
-    let _=completed_tx.send(result);
-    Ok(())
-   }));
-   unsafe{printer.Print(&settings,&completed)}.map_err(|e|e.to_string())?;
-   Ok(())
-  })();
-  if let Err(error)=result{let _=tx.send(Err(error));}
- }).map_err(|e|e.to_string())?;
- tauri::async_runtime::spawn_blocking(move ||rx.recv_timeout(Duration::from_secs(60)))
-  .await.map_err(|e|e.to_string())?.map_err(|_|"انتهت مهلة انتظار الطابعة".to_string())?
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-fn print_direct(_window:tauri::WebviewWindow,_thermal:bool,_page_height_mm:f64,_printer_name:String)->Result<(),String>{
- Err("الطباعة المباشرة متاحة على Windows فقط".into())
-}
+mod license;
+use license::{activate_license,license_status};
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -192,7 +105,7 @@ struct FabricUsagePayload{fabric_id:i64,thobe_index:i64,meters:f64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
-struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<String>,thobe_size:String,amount:f64,#[serde(default)] tailor_amount:Option<f64>}
+struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<String>,thobe_size:String,amount:f64}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -262,7 +175,7 @@ struct ExtraTransaction{
 #[serde(rename_all="camelCase")]
 struct StorageInfo{folder:String,database_path:String,is_custom:bool}
 
-struct SessionState(Mutex<Option<i64>>);
+pub(crate) struct SessionState(pub(crate) Mutex<Option<i64>>);
 
 fn default_data_dir(app:&AppHandle)->Result<PathBuf,String>{
  app.path().app_data_dir().map_err(|e|e.to_string())
@@ -580,7 +493,7 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  Ok(conn)
 }
 
-fn begin_session(app:&AppHandle)->Result<i64,String>{
+pub(crate) fn begin_session(app:&AppHandle)->Result<i64,String>{
  let conn=db(app)?;
  conn.execute(
   "UPDATE app_sessions SET ended_at=started_at WHERE ended_at IS NULL",
@@ -1286,7 +1199,7 @@ fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pi
 
 #[tauri::command]
 fn save_cut_prices(app:AppHandle,large_cut_price:f64,small_cut_price:f64)->Result<AppSettings,String>{
- if !large_cut_price.is_finite()||large_cut_price<0.0||!small_cut_price.is_finite()||small_cut_price<0.0{return Err("أجور الخياط يجب أن تكون أرقامًا صحيحة وغير سالبة".into())}
+ if !large_cut_price.is_finite()||large_cut_price<0.0||!small_cut_price.is_finite()||small_cut_price<0.0{return Err("أسعار القص يجب أن تكون أرقامًا صحيحة وغير سالبة".into())}
  let conn=db(&app)?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('large_cut_price',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[large_cut_price.to_string()]).map_err(|e|e.to_string())?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('small_cut_price',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[small_cut_price.to_string()]).map_err(|e|e.to_string())?;
@@ -1461,15 +1374,6 @@ fn verify_app_pin(app:AppHandle,pin:String)->Result<bool,String>{
 }
 
 #[tauri::command]
-fn admin_reset_pin(app:AppHandle,target:String,new_pin:String)->Result<AppSettings,String>{
- let pin=new_pin.trim();
- if pin.len()<4||pin.len()>8||!pin.chars().all(|character|character.is_ascii_digit()){return Err("الرمز الجديد يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
- let key=match target.as_str(){"app"=>"app_pin","finance"=>"finance_pin",_=>return Err("نوع الرمز غير صحيح".into())};
- let conn=db(&app)?;conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES(?1,?2) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",params![key,pin]).map_err(|e|e.to_string())?;
- get_app_settings(app)
-}
-
-#[tauri::command]
 fn save_theme(app:AppHandle,theme:String)->Result<AppSettings,String>{
  let value=if theme=="light"{"light"}else{"dark"};
  let conn=db(&app)?;
@@ -1600,8 +1504,7 @@ fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i
   if cut.thobe_index<0||!indexes.insert(cut.thobe_index){return Err("رقم الثوب في أجور العمال غير صحيح أو مكرر".into())}
   let size=cut.thobe_size.trim();
   if size!="كبير"&&size!="صغير"{return Err("حجم الثوب في أجر العامل غير صحيح".into())}
- if !cut.amount.is_finite()||cut.amount<0.0{return Err("أجر العامل غير صحيح".into())}
- if cut.tailor_amount.is_some_and(|amount|!amount.is_finite()||amount<0.0){return Err("أجر الخياط غير صحيح".into())}
+  if !cut.amount.is_finite()||cut.amount<0.0{return Err("أجر القص غير صحيح".into())}
   let worker=cut.worker_name.trim();
   if !worker.is_empty(){
    let mode:String=transaction.query_row("SELECT pay_mode FROM workers WHERE name=?1 AND role='قصاص'",[worker],|row|row.get(0)).map_err(|_|"القصاص غير موجود".to_string())?;
@@ -1630,10 +1533,11 @@ fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i
     "SELECT worker_id,thobe_size,amount FROM worker_tailor_entries WHERE invoice_id=?1 AND thobe_index=?2",
     params![invoice_id,cut.thobe_index],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
    ).optional().map_err(|e|e.to_string())?;
-   let earned=if mode=="راتب"{0.0}else if let Some(custom_amount)=cut.tailor_amount{custom_amount}else{match existing{
+   let earned=match existing{
     Some((old_id,old_size,old_amount)) if old_id==worker_id&&old_size==size=>old_amount,
-    _=>if size=="كبير"{large}else{small}
-   }};
+    _ if mode=="قطعة"=>if size=="كبير"{large}else{small},
+    _=>0.0
+   };
    transaction.execute(
     "INSERT INTO worker_tailor_entries(invoice_id,thobe_index,worker_id,thobe_size,amount,created_at)
      VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))
@@ -1707,11 +1611,14 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
 }
 
 fn main(){
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{
-   let session_id=begin_session(&app.handle()).map_err(std::io::Error::other)?;
-   app.manage(SessionState(Mutex::new(Some(session_id))));
+   let session_id=if license::activated(&app.handle()).map_err(std::io::Error::other)?{
+    Some(begin_session(&app.handle()).map_err(std::io::Error::other)?)
+   }else{None};
+   app.manage(SessionState(Mutex::new(session_id)));
    Ok(())
   })
   .on_window_event(|window,event|{
@@ -1726,7 +1633,17 @@ fn main(){
     }
    }
   })
-  .invoke_handler(tauri::generate_handler![print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice])
+  .invoke_handler(move |invoke|{
+   let command=invoke.message.command();
+   if command!="license_status"&&command!="activate_license"{
+    match license::activated(&invoke.message.webview().app_handle()){
+     Ok(true)=>{},
+     Ok(false)=>{invoke.resolver.reject("يلزم تفعيل البرنامج لهذا الجهاز أولًا");return true},
+     Err(error)=>{invoke.resolver.reject(error);return true},
+    }
+   }
+   handler(invoke)
+  })
   .run(tauri::generate_context!())
   .expect("تعذر تشغيل TAILOR");
 }

@@ -10,6 +10,7 @@ button{font:inherit}
 .app-lock-card{width:min(430px,94vw);display:grid;justify-items:center;gap:14px;padding:42px;border:1px solid #3b6154;border-radius:26px;color:#eef4ef;background:linear-gradient(145deg,#142a23,#0b1915);box-shadow:0 28px 90px #0009;text-align:center}
 .app-lock-logo{width:68px;height:68px;display:grid;place-items:center;border-radius:20px;color:#13241e;background:linear-gradient(135deg,#666b70,#4f5458);font-size:2rem;font-weight:700;box-shadow:0 12px 30px #0005}.app-lock-card small{color:#73787c}.app-lock-card h1{margin:0;font-size:1.7rem}.app-lock-card p{margin:0 0 4px;color:#a9bbb3}.app-lock-card input{width:100%;height:58px;padding:0 18px;border:1px solid #4b7063;border-radius:14px;outline:0;color:#fff;background:#081510;text-align:center;font-size:1.5rem;letter-spacing:.3em}.app-lock-card input:focus{border-color:#61666b;box-shadow:0 0 0 4px #61666b22}.app-lock-card>b{color:#c8c5bf;font-size:.75rem}.app-lock-card button{width:100%;height:52px;border:1px solid #666b70;border-radius:13px;color:#18251f;background:#61666b;font-weight:700;cursor:pointer}.app-lock-card button:disabled{opacity:.45;cursor:not-allowed}.app-lock-loading{color:#777c80;font-weight:700}
 .app-lock-shell.theme-light{color:#35250f;background:radial-gradient(circle at 50% 20%,#dedbd5 0,transparent 38%),#f2efe9}.theme-light .app-lock-card{color:#35250f;border-color:#b9b3aa;background:#fffdf8;box-shadow:0 28px 80px #5c60632e}.theme-light .app-lock-card p{color:#5d6266}.theme-light .app-lock-card input{color:#35250f;border-color:#b9b3aa;background:#faf8f4}
+.activation-card{width:min(570px,96vw);max-height:96vh;overflow:auto;text-align:right;justify-items:stretch;gap:12px;padding:28px}.activation-card .app-lock-logo{justify-self:center}.activation-card h1,.activation-card>small,.activation-card>p{text-align:center}.activation-card .activation-label{font-size:.88rem;color:#d4e2d9;font-weight:700}.activation-device-code{display:block;padding:14px 12px;border:1px solid #557267;border-radius:12px;color:#fff;background:#091b15;text-align:center;font:1.03rem Arial,sans-serif;letter-spacing:.04em;user-select:all;overflow-wrap:anywhere}.activation-card textarea{width:100%;min-height:95px;resize:vertical;padding:12px;color:#fff;background:#091b15;border:1px solid #557267;border-radius:12px;font:1rem Arial,sans-serif;direction:ltr}.activation-card input[type=file]{height:auto;min-height:50px;padding:9px;letter-spacing:normal;text-align:right;font-size:.85rem}.activation-card button{height:46px}
 .topbar{height:80px;display:flex;direction:ltr;justify-content:space-between;align-items:center;padding:0 4px 20px;border-bottom:1px solid #284940}
 .brand{direction:rtl;display:flex;gap:12px;align-items:center}
 .brand>span{display:grid;place-items:center;background:linear-gradient(135deg,#666b70,#4f5458);color:#10221d;font-size:1.55rem;font-weight:700;width:50px;height:50px;border-radius:16px;box-shadow:0 8px 18px #0005}
@@ -3832,93 +3833,30 @@ button{font:inherit}
 }
 
 .settings-control-card.settings-storage-panel{
-  grid-column:auto!important;
-  display:grid!important;
-  align-content:start!important;
-  gap:10px!important;
   margin:0!important;
   padding:15px!important;
 }
-.settings-storage-header{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:space-between!important;
-  gap:8px!important;
+.settings-control-card.settings-storage-panel>.settings-card-icon{
+  margin-bottom:8px!important;
 }
-.settings-storage-title{display:flex!important;align-items:center!important;gap:10px!important;min-width:0!important}
-.settings-storage-title>.settings-card-icon{
-  width:34px!important;height:34px!important;margin:0!important;
-  border-radius:10px!important;font-size:.65rem!important;
-}
-.settings-storage-title>div:last-child{display:grid!important;gap:3px!important;min-width:0!important}
-.settings-storage-title span{color:var(--muted)!important;font-size:.65rem!important;font-weight:700!important}
-.settings-storage-title h2{margin:0!important;color:var(--text)!important;font-size:1.03rem!important;line-height:1.4!important}
-.settings-storage-location{
-  display:inline-flex!important;align-items:center!important;gap:5px!important;
-  flex:none!important;padding:5px 9px!important;border:1px solid var(--line)!important;
-  border-radius:999px!important;background:var(--surface-muted)!important;
-  color:var(--accent)!important;font-size:.67rem!important;font-style:normal!important;font-weight:800!important;
-}
-.settings-storage-panel svg{width:16px;height:16px;flex:none}
 .settings-control-card .settings-storage-body{
   display:grid!important;
-  grid-template-columns:minmax(0,1fr)!important;
-  gap:9px!important;
-  min-width:0!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:10px!important;
+  align-items:end!important;
 }
 .settings-control-card .settings-path-card{
-  display:grid!important;
-  gap:6px!important;
   min-width:0!important;
-  padding:8px!important;
+  padding:9px!important;
   border:1px solid var(--line)!important;
   border-radius:10px!important;
   background:var(--surface-soft)!important;
 }
-.settings-control-card .settings-path-row{
-  display:grid!important;
-  grid-template-columns:105px minmax(0,1fr)!important;
-  align-items:stretch!important;
-  gap:6px!important;
-  min-width:0!important;
-}
-.settings-control-card .settings-path-label{
-  display:flex!important;align-items:center!important;gap:5px!important;
-  min-width:0!important;padding:5px 8px!important;border-radius:8px!important;
-  background:var(--surface-muted)!important;color:var(--text)!important;
-  font-size:.72rem!important;font-weight:700!important;
-}
-.settings-control-card .settings-path-value{
-  display:flex!important;align-items:center!important;justify-content:flex-end!important;
-  min-width:0!important;min-height:37px!important;padding:5px 9px!important;
-  border:1px solid var(--line)!important;border-radius:8px!important;
-  background:var(--surface-muted)!important;color:var(--text)!important;
-  font:600 .73rem/1.5 "Segoe UI",Tahoma,Arial,sans-serif!important;
-  direction:ltr!important;text-align:right!important;overflow-wrap:anywhere!important;
-  white-space:normal!important;
-}
-.settings-control-card .settings-storage-actions{display:flex!important;flex-wrap:wrap!important;gap:7px!important}
-.settings-control-card .settings-storage-actions>button{
-  display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;
-  min-height:38px!important;padding:7px 10px!important;border:1px solid var(--line-strong)!important;
-  border-radius:9px!important;color:var(--text)!important;background:var(--surface)!important;
-  font:700 .73rem/1.4 "Segoe UI",Tahoma,Arial,sans-serif!important;
-  cursor:pointer!important;
-}
-.settings-control-card .settings-storage-actions>.settings-primary{
-  border-color:var(--accent)!important;color:#fff!important;background:var(--accent)!important;
-}
-.settings-control-card.settings-storage-panel>.settings-alert{
-  display:flex!important;align-items:center!important;gap:7px!important;
-  min-width:0!important;margin:0!important;padding:7px 10px!important;
-  border:1px solid var(--line)!important;border-radius:9px!important;
-  background:var(--surface-muted)!important;color:var(--muted)!important;
-  font-size:.7rem!important;line-height:1.6!important;
-}
-.settings-storage-panel>.settings-alert>span{
-  display:grid!important;place-items:center!important;flex:none!important;
-  width:21px!important;height:21px!important;border-radius:50%!important;
-  background:var(--accent)!important;color:#fff!important;font:800 .78rem Arial,sans-serif!important;
+.settings-control-card .settings-path-card b,
+.settings-control-card .settings-path-card span{
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
 }
 
 .settings-library-section{
@@ -3954,14 +3892,13 @@ button{font:inherit}
 @media(max-width:1250px){
   .measurement-setup-bar{grid-template-columns:1fr 1fr!important}
   .settings-overview-grid{grid-template-columns:1fr 1fr!important}
+  .settings-control-card.settings-storage-panel{grid-column:1/-1!important}
 }
 @media(max-width:760px){
   .measurement-setup-bar{grid-template-columns:1fr!important}
   .settings-overview-grid{grid-template-columns:1fr!important}
-  .settings-control-card.settings-storage-panel{padding:15px!important}
-  .settings-storage-header{align-items:start!important;flex-wrap:wrap!important}
-  .settings-control-card .settings-path-row{grid-template-columns:1fr!important;gap:5px!important}
-  .settings-control-card .settings-storage-actions>button{width:100%!important}
+  .settings-control-card.settings-storage-panel{grid-column:auto!important}
+  .settings-control-card .settings-storage-body{grid-template-columns:1fr!important}
   .cut-price-fields{grid-template-columns:1fr!important}
 }
 
@@ -4748,176 +4685,3 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 @media(max-width:760px){.preview-dialog .receipt-paper{transform:scale(.65);transform-origin:top center;margin-bottom:-50mm}}
 
 .preview-overlay{z-index:50}
-
-/* Finance entry: four clear sections, matching the requested two-by-two layout. */
-.app-shell .finance-hub-grid{width:min(760px,100%);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:30px auto 50px}
-.app-shell .finance-hub-card{aspect-ratio:1/1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:24px;border:2px solid var(--line-strong);border-radius:18px;color:var(--text);background:var(--surface);text-align:right;font:inherit;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
-.app-shell .finance-hub-card:hover,.app-shell .finance-hub-card:focus-visible{border-color:var(--accent);box-shadow:0 12px 28px #0003;transform:translateY(-3px)}
-.app-shell .finance-hub-icon{width:45px;height:45px;display:grid;place-items:center;border:1px solid var(--line-strong);border-radius:12px;color:var(--accent);background:var(--surface-soft);font-size:25px}
-.app-shell .finance-hub-card strong{font-size:1.55rem;line-height:1.35}
-.app-shell .finance-hub-card small{color:var(--muted);font-size:.88rem;line-height:1.7}
-.app-shell .finance-hub-arrow{margin-top:auto;color:var(--accent);font-size:.78rem;font-weight:800}
-.app-shell .finance-section-nav{display:flex;align-items:center;gap:14px;margin:8px 0 20px;color:var(--muted)}
-.app-shell .finance-section-nav button{min-height:40px;padding:8px 13px;border:1px solid var(--line-strong);border-radius:9px;color:var(--text);background:var(--surface);font:inherit;cursor:pointer}
-.app-shell .finance-section-nav span{font-weight:800}
-.app-shell .finance-basic-form{width:min(520px,100%);margin-top:18px}
-.worker-delete-overlay{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;background:#000a}
-.worker-delete-dialog{width:min(480px,100%);padding:25px;border:1px solid var(--line-strong);border-radius:17px;color:var(--text);background:var(--surface);box-shadow:0 24px 65px #0009}
-.worker-delete-dialog h2{margin:0 0 12px;font-size:1.22rem}
-.worker-delete-dialog p{margin:0 0 20px;color:var(--muted);line-height:1.9}
-.worker-delete-dialog p strong{color:var(--text)}
-.worker-delete-dialog .worker-delete-error{color:var(--danger)}
-.worker-delete-dialog>div{display:flex;justify-content:flex-end;gap:9px}
-.worker-delete-dialog button{min-height:40px;padding:8px 14px;border:1px solid var(--line-strong);border-radius:9px;color:var(--text);background:var(--surface-soft);font:inherit;cursor:pointer}
-.worker-delete-dialog .worker-delete-confirm{border-color:var(--danger);color:#fff;background:#9b3636}
-.worker-delete-dialog button:disabled{opacity:.6;cursor:wait}
-@media(max-width:620px){.app-shell .finance-hub-grid{gap:10px}.app-shell .finance-hub-card{gap:6px;padding:12px;border-radius:12px}.app-shell .finance-hub-icon{width:32px;height:32px;font-size:18px}.app-shell .finance-hub-card strong{font-size:1rem}.app-shell .finance-hub-card small{font-size:.66rem;line-height:1.4}.app-shell .finance-hub-arrow{font-size:.66rem}}
-.app-shell .finance-section-note{margin:12px 0 19px;padding:10px 13px;border:1px solid var(--line);border-radius:9px;color:var(--muted);background:var(--surface-soft);font-size:.78rem;line-height:1.8}
-
-/* Fit the four finance choices inside the desktop viewport without an inner scrollbar. */
-@media(min-width:761px) and (min-height:761px){
-  .app-shell .finance-hub-page{height:calc(100dvh - 100px)!important;overflow:hidden!important;padding-bottom:10px!important}
-  .app-shell .finance-hub-page .business-head{margin-bottom:8px!important}
-  .app-shell .finance-hub-grid{width:min(640px,calc(100dvh - 260px),100%)!important;gap:12px!important;margin:12px auto 0!important}
-  .app-shell .finance-hub-card{gap:8px!important;padding:17px!important}
-}
-@media(max-height:760px){.app-shell .finance-hub-grid{width:min(510px,100%);gap:10px;margin:12px auto}.app-shell .finance-hub-card{padding:12px}}
-
-/* The tailor and their wage share one row with the two measurement selectors. */
-@media(min-width:1251px){
-  .app-shell .measurement-setup-bar{grid-template-columns:minmax(0,.9fr) minmax(0,1.05fr) minmax(0,1.6fr) minmax(0,1.15fr)!important;gap:7px!important;margin:6px 0!important}
-  .app-shell .measurement-setup-card{min-height:78px!important;gap:4px!important;padding:7px 9px!important}
-  .app-shell .measurement-setup-card .size-mode-row{min-height:18px!important}
-}
-@media(min-width:1400px) and (min-height:850px){
-  .app-shell .order-page.compact-order{padding:6px 4px 12px!important}
-  .app-shell .measure-columns{min-height:0!important;gap:8px!important;margin:6px 0!important}
-  .app-shell .measure-column{min-height:0!important;padding:8px!important}
-  .app-shell .measure-column>header{min-height:30px!important;margin-bottom:5px!important;padding-bottom:4px!important}
-  .app-shell .compact-photo{min-height:62px!important;grid-template-columns:48px minmax(0,1fr)!important;padding:5px!important}
-  .app-shell .compact-photo img,.app-shell .compact-photo>span{width:48px!important;height:48px!important}
-  .app-shell .double-photo .compact-photo{min-height:70px!important}
-  .app-shell .double-photo .compact-photo img,.app-shell .double-photo .compact-photo>span{height:44px!important}
-  .app-shell .vertical-fields{gap:4px!important}
-  .app-shell .compact-field,.app-shell .compact-select{padding:4px 6px!important}
-  .app-shell .measure-input-wrap,.app-shell .named-dual-measure,.app-shell .dual-measure{height:30px!important}
-  .app-shell .measure-input-wrap input,.app-shell .dual-measure input,.app-shell .named-dual-measure input,.app-shell .measure-unit-badge,.app-shell .named-dual-measure em{height:28px!important}
-  .app-shell .compact-select select{height:30px!important}
-  .app-shell .compact-notes textarea{min-height:48px!important}
-}
-
-.dashboard-work-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 9px}
-.dashboard-work-actions h2{margin:0;font-size:1rem}
-.dashboard-work-actions button{min-height:38px;padding:7px 13px;border:1px solid var(--line-strong);border-radius:9px;color:#fff;background:var(--accent);font:inherit;font-weight:800;cursor:pointer}
-@media(max-width:760px){.dashboard-work-actions{flex-wrap:wrap}.dashboard-work-actions button{width:100%}}
-
-/* Larger Arabic text across half-A4 print sheets, while preserving their fixed dimensions. */
-.measurement-paper header b{font-size:20px}
-.measurement-paper header strong{font-size:15px}
-.measurement-paper header small{font-size:12px}
-.measurement-paper .paper-customer{font-size:13px}
-.measurement-paper .paper-work-card>h3{font-size:16px}
-.measurement-paper .paper-values p{font-size:14px}
-.measurement-paper .paper-values p>b{font-size:16px}
-.measurement-paper .paper-values .paper-note b{font-size:13px}
-.measurement-paper .paper-feature-photo figcaption{font-size:12px}
-.measurement-paper .paper-double-photo .paper-feature-photo figcaption{font-size:11px}
-.receipt-paper{font-size:14px!important}
-.receipt-paper>h2{font-size:24px;line-height:1.25;overflow-wrap:anywhere}
-.receipt-paper>small{font-size:12px}
-.a5-financial-sheet .a5-report-grid span,.a5-financial-sheet .a5-operation-grid span,.a5-financial-sheet .supplier-payment-body span{font-size:13px}
-.a5-financial-sheet>footer{font-size:14px}
-
-/* Customer price and laundry slips use the 80 mm thermal roll. */
-.preview-dialog.thermal-dialog{width:min(425px,98vw)}
-.preview-dialog.thermal-dialog .receipt-paper{width:76mm!important;min-height:0!important;height:auto!important;max-height:none!important;overflow:visible!important;margin:0 auto!important;margin-bottom:0!important;padding:3mm!important;transform:none!important;text-align:right!important;font-size:13px!important;line-height:1.4!important}
-.preview-dialog.thermal-dialog .receipt-paper>h2{font-size:20px!important}
-.preview-dialog.thermal-dialog .receipt-paper>div{gap:1mm!important;margin:.6mm 0!important;padding:.8mm 1mm!important}
-.preview-dialog.thermal-dialog .receipt-paper>hr{margin:1mm 0!important}
-.preview-dialog.thermal-dialog .receipt-thobes{grid-template-columns:1fr!important;gap:1mm!important}
-.preview-dialog.thermal-dialog .receipt-thobes>p{grid-template-columns:auto 1fr!important;gap:1mm!important;padding:1mm!important}
-.side-right .side-cards{grid-template-rows:repeat(6,minmax(0,1fr))}
-.side-left .side-cards{grid-template-rows:repeat(5,minmax(0,1fr))}
-
-/* Keep the dashboard's work board in its own grid row. */
-.side-right .side-cards{grid-template-rows:repeat(5,minmax(0,1fr))}
-.app-shell{font-family:"Segoe UI",Tahoma,Arial,sans-serif}
-.side-label{font-size:14px}
-.nav-card>span:last-of-type{font-size:15px;line-height:1.35}
-.greeting>span,.greeting p,.greeting time{font-size:14px}
-.metric-card p{font-size:15px}
-.work-board-column h2{font-size:14px}
-.work-board-column header>b{font-size:13px}
-.work-board-search input{font:600 13px "Segoe UI",Tahoma,Arial,sans-serif}
-.work-board-item strong{font-size:14px}
-.work-board-item small{font-size:11px}
-.dashboard-work-actions{min-height:40px;margin:0}
-.dashboard-work-actions h2{font-size:17px}
-@media(min-width:761px){
- .dashboard{grid-template-rows:96px 96px 42px minmax(0,1fr)}
- .work-board{height:100%;min-height:0}
-}
-@media(min-width:761px) and (max-width:1250px){
- .dashboard{grid-template-rows:96px 96px 42px minmax(0,1fr)}
- .nav-card>span:last-of-type{font-size:13px}
-}
-
-/* Each financial sheet uses the whole upper half of an A4 page. */
-.a5-financial-sheet{display:flex;flex-direction:column}
-.a5-financial-sheet>footer{margin-top:auto}
-.supplier-payment-body{flex:1;grid-template-rows:repeat(2,minmax(0,1fr));margin:5mm 0 3mm}
-.supplier-payment-body p{min-height:0}
-.supplier-payment-body span{font-size:15px}
-.supplier-payment-body b{font-size:20px}
-.a5-financial-sheet>footer{font-size:15px}
-.settings-printers-card{align-content:start!important;gap:12px!important}
-.settings-printer-fields{grid-column:1/-1;display:grid;gap:14px}
-.settings-printer-fields label{display:grid;gap:7px;color:var(--text);font-size:14px;font-weight:700}
-.settings-printer-fields select{width:100%;min-width:0;height:44px;padding:0 12px;border:1px solid var(--line-strong);border-radius:9px;color:var(--text);background:var(--surface-soft);font:inherit}
-
-/* WebView2's silent printer prints the main webview, so select one sheet for it. */
-@media print{
- html[data-print-target] body,html[data-print-target] #root{width:210mm!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:0!important}
- html[data-print-target] .app-shell{width:210mm!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:0!important}
- html[data-print-target] .app-shell>*:not(.print-area){display:none!important}
- html[data-print-target] .print-area{display:block!important;width:210mm!important;margin:0!important;padding:0!important}
- html[data-print-target] .print-area>*{display:none!important}
- html[data-print-target="measurements"] .print-area>.measurement-print-stack,
- html[data-print-target="receipt"] .print-area>.customer-receipt-stack,
- html[data-print-target="laundry"] .print-area>.laundry-print-stack,
- html[data-print-target="extra"] .print-area>.extra-receipt,
- html[data-print-target="report"] .print-area>.report-print-sheet,
- html[data-print-target="supplier"] .print-area>.supplier-payment-sheet,
- html[data-print-target="supply"] .print-area>.supply-entry-sheet,
- html[data-print-target="finance"] .print-area>.financial-entry-sheet{display:block!important}
- html[data-print-target] .print-area .paper{display:none!important}
- html[data-print-target="measurements"] .print-area .measurement-paper,
- html[data-print-target="receipt"] .print-area .customer-receipt,
- html[data-print-target="laundry"] .print-area .laundry-receipt{display:block!important}
- html[data-print-target="extra"] .print-area>.extra-receipt,
- html[data-print-target="report"] .print-area>.report-print-sheet,
- html[data-print-target="supplier"] .print-area>.supplier-payment-sheet,
- html[data-print-target="supply"] .print-area>.supply-entry-sheet,
- html[data-print-target="finance"] .print-area>.financial-entry-sheet{display:flex!important}
- html[data-print-target] .print-area .paper{width:210mm!important;height:147mm!important;min-height:147mm!important;max-height:147mm!important;margin:0!important;padding:5mm 7mm!important;overflow:hidden!important;border:0!important;border-radius:0!important;box-shadow:none!important;transform:none!important;break-inside:avoid!important;page-break-inside:avoid!important}
- html[data-print-target="measurements"] .print-area .measurement-paper{padding:3mm 4mm!important}
- html[data-print-target="measurements"] .print-area .paper-work-grid{height:107mm!important}
- html[data-print-target] .print-area .a5-financial-sheet{flex-direction:column!important}
- html[data-print-target] .print-area .a5-financial-sheet>footer{margin-top:auto!important;font-size:16px!important}
- html[data-print-target] .print-area .supplier-payment-body{flex:1!important;grid-template-rows:repeat(2,minmax(0,1fr))!important;margin:4mm 0 2mm!important}
- html[data-print-target] .print-area .supplier-payment-body p{min-height:0!important}
- html[data-print-target] .print-area .supplier-payment-body span{font-size:16px!important}
- html[data-print-target] .print-area .supplier-payment-body b{font-size:21px!important}
- html[data-print-target] .print-area .a5-financial-sheet header h2{font-size:29px!important}
- html[data-print-target] .print-area .a5-report-grid span,html[data-print-target] .print-area .a5-operation-grid span{font-size:15px!important}
- html[data-print-target="measurements"] .print-area .measurement-paper:not(:last-child),
- html[data-print-target="laundry"] .print-area .laundry-receipt:not(:last-child){break-after:page!important;page-break-after:always!important}
- html[data-print-target="receipt"] body,html[data-print-target="laundry"] body,
- html[data-print-target="receipt"] #root,html[data-print-target="laundry"] #root,
- html[data-print-target="receipt"] .app-shell,html[data-print-target="laundry"] .app-shell,
- html[data-print-target="receipt"] .print-area,html[data-print-target="laundry"] .print-area{width:80mm!important}
- html[data-print-target="receipt"] .print-area .receipt-paper,html[data-print-target="laundry"] .print-area .receipt-paper{width:80mm!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;margin:0!important;padding:3mm 4mm!important;text-align:right!important;font:13px/1.5 Tahoma,"Segoe UI",Arial,sans-serif!important}
- html[data-print-target="receipt"] .print-area .receipt-paper>div,html[data-print-target="laundry"] .print-area .receipt-paper>div{display:grid!important;grid-template-columns:1fr auto!important;gap:1mm!important;margin:.6mm 0!important;padding:.8mm 1mm!important;border:1px solid #777!important;overflow-wrap:anywhere!important}
- html[data-print-target="receipt"] .print-area .receipt-thobes{grid-template-columns:1fr!important}
- html[data-print-target="receipt"] .print-area .receipt-thobes>p{grid-template-columns:auto 1fr!important}
-}
