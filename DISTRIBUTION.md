@@ -1,6 +1,6 @@
-# TAILOR 0.2.1: distribution and offline activation
+# TAILOR 0.2.2: distribution and offline activation
 
-The Windows installer is built by the **Windows installer** GitHub Actions workflow and published under the repository's **Releases** page as `TAILOR_0.2.1_x64-setup.exe`. It can also be built on a configured Windows developer PC with `npm.cmd run tauri build`. The local NSIS setup program appears in `src-tauri/target/release/bundle/nsis/`. The installer includes the WebView2 offline installer, so the recipient does not need development tools or an internet connection to install.
+The Windows installer is built by the **Windows installer** GitHub Actions workflow and published under the repository's **Releases** page as `TAILOR_0.2.2_x64-setup.exe`. It can also be built on a configured Windows developer PC with `npm.cmd run tauri build`. The local NSIS setup program appears in `src-tauri/target/release/bundle/nsis/`. The installer includes the WebView2 offline installer, so the recipient does not need development tools or an internet connection to install.
 
 Give customers **only the NSIS setup file**. Do not copy the full `H:\TAILOR` development folder or its debug builds to a customer device.
 
