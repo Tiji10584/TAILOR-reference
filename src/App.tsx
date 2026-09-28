@@ -37,7 +37,7 @@ type DebtInvoice = { invoiceId:number;invoiceNumber:string;customerName:string;p
 type FinancialOverview = { todaySales:number;todayReceived:number;todayExtraIncome:number;todayExpenses:number;totalOutstanding:number;monthSales:number;monthReceived:number;monthExtraIncome:number;monthExpenses:number;entries:FinancialEntry[];debts:DebtInvoice[] };
 type DailyReport = { reportDate:string;period:"يومي"|"شهري"|"سنوي";periodLabel:string;newCustomers:number;invoices:number;thobes:number;invoiceSales:number;invoiceReceived:number;extraIncome:number;expenses:number;delivered:number;fabricUsed:number;fabricSold:number };
 type AppSettings = { shopName:string;ownerName:string;accountantName:string;financePinSet:boolean;appPinSet:boolean;theme:"dark"|"light";initialized:boolean;largeCutPrice:number;smallCutPrice:number };
-type LicenseStatus = { activated:boolean;deviceCode:string };
+type LicenseStatus = { activated:boolean;deviceCode:string;expiresAt:number|null;previouslyActivated:boolean;trialExpired:boolean;clockWarning:boolean };
 type SleeveMode = "سادة"|"كبك";
 type CollarMode = "قلاب"|"سادة"|"بدون رقبة";
 type NeckButtonType = "طقطق"|"بلاستيك";
@@ -53,6 +53,16 @@ const hijriDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-
 const timeFormat = new Intl.DateTimeFormat("ar-SA-u-nu-latn",{hour:"2-digit",minute:"2-digit",hour12:false});
 const numberFormat = new Intl.NumberFormat("en-US",{useGrouping:false,maximumFractionDigits:2});
 const moneyFormat = new Intl.NumberFormat("en-US",{maximumFractionDigits:2});
+const licenseDateFormat = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn",{year:"numeric",month:"long",day:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
+
+function licenseExpiryHint(text:string){
+  try{
+    const document=JSON.parse(text);
+    if(document.version===1||document.version===2&&document.expiresAt===null)return "دائم";
+    if(document.version===2&&Number.isSafeInteger(document.expiresAt))return licenseDateFormat.format(new Date(document.expiresAt));
+  }catch{/* The file is not valid JSON yet. */}
+  return "";
+}
 
 const bodyLengthFields = ["طول أمام","طول خلف"] as const;
 const bodyFields = ["طول أمام","طول خلف","الكتف","مقاس الصدر","مقاس العرض","مقاس عند الجيوب","مقاس الخطوة تحت","خبنة"] as const;
@@ -150,6 +160,8 @@ type SheetProps={shopName:string;customer:Customer;invoice:InvoiceRecord|null;we
 export default function App(){
   const [license,setLicense]=useState<LicenseStatus|null>(null);
   const [licenseText,setLicenseText]=useState("");
+  const [activationMode,setActivationMode]=useState<""|"timed"|"permanent">("");
+  const [activationExpiry,setActivationExpiry]=useState("");
   const [licenseError,setLicenseError]=useState("");
   const [licenseBusy,setLicenseBusy]=useState(false);
   const [view,setView]=useState<View>("dashboard");const [financeSection,setFinanceSection]=useState<FinanceSection>("home");const [suppliersReturnToFinance,setSuppliersReturnToFinance]=useState(false);const [workerDeleteTarget,setWorkerDeleteTarget]=useState<{name:string;id:number|null}|null>(null);const [workerDeleteBusy,setWorkerDeleteBusy]=useState(false);const [workerDeleteError,setWorkerDeleteError]=useState("");const [data,setData]=useState<Dashboard|null>(null);const [workItems,setWorkItems]=useState<WorkBoardItem[]>([]);const [workQueries,setWorkQueries]=useState<Record<string,string>>({});const [movingOrder,setMovingOrder]=useState<number|null>(null);const [selectedOrders,setSelectedOrders]=useState<Set<number>>(()=>new Set());const [bulkTarget,setBulkTarget]=useState<string>(workStatuses[0]);const [session,setSession]=useState<CurrentSession|null>(null);const [history,setHistory]=useState<SessionEntry[]>([]);const [historyOpen,setHistoryOpen]=useState(false);const [selectedDay,setSelectedDay]=useState("");const [now,setNow]=useState(Date.now());const [error,setError]=useState("");
@@ -212,7 +224,13 @@ export default function App(){
   async function loadAppSettings(){try{const next=await invoke<AppSettings>("get_app_settings");setAppSettings(next);setSettingsShopName(next.shopName);setSettingsOwnerName(next.ownerName);setSettingsAccountantName(next.accountantName||"");setSettingsLargeCutPrice(String(next.largeCutPrice));setSettingsSmallCutPrice(String(next.smallCutPrice));setAppUnlocked(current=>current||!next.appPinSet)}catch{setAccessMessage("تعذر قراءة الصلاحيات.")}finally{setAppAccessChecked(true)}}
   async function submitLicense(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
-    try{setLicenseBusy(true);setLicenseError("");const next=await invoke<LicenseStatus>("activate_license",{licenseText:licenseText.trim()});setLicense(next);setLicenseText("")}
+    try{
+      setLicenseBusy(true);setLicenseError("");
+      const selectedExpiryAt=activationMode==="timed"?Date.parse(activationExpiry):null;
+      if(!activationMode||activationMode==="timed"&&(!Number.isFinite(selectedExpiryAt)||selectedExpiryAt===null))throw new Error("حدد نوع التفعيل والتاريخ والساعة أولًا");
+      const next=await invoke<LicenseStatus>("activate_license",{licenseText:licenseText.trim(),activationMode,selectedExpiryAt});
+      setLicense(next);setLicenseText("");setActivationMode("");setActivationExpiry("");
+    }
     catch(error){setLicenseError(String(error).replace(/^Error:\s*/,""))}
     finally{setLicenseBusy(false)}
   }
@@ -256,6 +274,22 @@ export default function App(){
   function toggleOrder(orderId:number){setSelectedOrders(current=>{const next=new Set(current);next.has(orderId)?next.delete(orderId):next.add(orderId);return next})}
   async function moveSelectedOrders(){if(!selectedOrders.size){setError("حدد ثوبًا واحدًا على الأقل.");return}try{await invoke("move_orders_to_status",{orderIds:Array.from(selectedOrders),status:bulkTarget});setSelectedOrders(new Set());setError("");await load()}catch(error){setError(String(error))}}
   useEffect(()=>{void invoke<LicenseStatus>("license_status").then(setLicense).catch(error=>setLicenseError(String(error)));const interval=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(interval)},[]);
+  useEffect(()=>{
+    if(!license?.activated)return;
+    let active=true;
+    const interval=window.setInterval(()=>{
+      void invoke<LicenseStatus>("license_status").then(next=>{
+        if(!active)return;
+        if(!next.activated){setView("dashboard");setFinanceUnlocked(false);setAppUnlocked(false)}
+        setLicense(next);
+      }).catch(error=>{
+        if(!active)return;
+        setLicenseError(String(error).replace(/^Error:\s*/,""));setLicense(current=>current?{...current,activated:false}:current);
+        setView("dashboard");setFinanceUnlocked(false);setAppUnlocked(false);
+      });
+    },2000);
+    return()=>{active=false;window.clearInterval(interval)};
+  },[license?.activated]);
   useEffect(()=>{if(!license?.activated)return;void load();void loadDesignOptions();void loadStorageInfo();void loadSuppliers();void loadSupplierPayments();void loadFabrics();void loadExtraTransactions();void loadAppSettings();void loadWorkerProfiles()},[license?.activated]);
   useEffect(()=>{if(view!=="customers")return;const timer=window.setTimeout(()=>void searchCustomerRecords(customerQuery),180);return()=>window.clearTimeout(timer)},[customerQuery,view]);
   useEffect(()=>{if(view==="add-customer"){setCustomerName("");setCustomerPhone("");setCustomerError("")}},[view]);
@@ -572,7 +606,25 @@ export default function App(){
   })):[];
   const previewTitle=previewTarget==="measurements"?`معاينة طباعة المقاسات — ${measurementSheets.length} ورقة A5 أفقية (نصف A4)`:previewTarget==="receipt"?"معاينة فاتورة السعر للعميل":previewTarget==="laundry"?`معاينة فواتير المغسلة — ${outputDrafts.length} فاتورة`:previewTarget==="report"?"معاينة التقرير المالي — نصف A4":previewTarget==="supplier"?"معاينة سند دفع المورد — نصف A4":previewTarget==="finance"?"معاينة سند الحركة المالية — نصف A4":previewTarget==="supply"?"معاينة فاتورة التوريد — نصف A4":"معاينة فاتورة الدخل الإضافي";
 
-  if(!license?.activated)return <main className="app-lock-shell theme-dark" dir="rtl"><form className="app-lock-card activation-card" onSubmit={event=>void submitLicense(event)}><span className="app-lock-logo">ت</span><small>TAILOR 0.2.5</small><h1>تفعيل البرنامج</h1><p>أرسل رمز هذا الجهاز لمالك الترخيص، ثم أدخل ملف التفعيل الذي يصدره لك.</p>{license?.deviceCode&&<><span className="activation-label">رمز الجهاز</span><code className="activation-device-code" dir="ltr">{license.deviceCode}</code><button type="button" onClick={()=>void navigator.clipboard.writeText(license.deviceCode).then(()=>setLicenseError("تم نسخ رمز الجهاز")).catch(()=>setLicenseError("حدد الرمز وانسخه يدويًا"))}>نسخ رمز الجهاز</button></>}<label className="activation-label" htmlFor="license-file">استيراد ملف التفعيل</label><input id="license-file" type="file" accept=".json,application/json" onChange={event=>{const file=event.target.files?.[0];if(file)void file.text().then(setLicenseText).catch(()=>setLicenseError("تعذر قراءة الملف"))}}/><textarea aria-label="نص التفعيل" value={licenseText} onChange={event=>setLicenseText(event.target.value)} placeholder="أو الصق نص التفعيل هنا"/><button type="submit" disabled={licenseBusy||!licenseText.trim()}>{licenseBusy?"جارٍ التحقق…":"تفعيل"}</button>{licenseError&&<b role="alert">{licenseError}</b>}</form></main>;
+  if(!license?.activated)return <main className="app-lock-shell theme-dark" dir="rtl">
+    <form className="app-lock-card activation-card" onSubmit={event=>void submitLicense(event)}>
+      <span className="app-lock-logo">ت</span><small>TAILOR 0.2.6</small><h1>تفعيل البرنامج</h1>
+      <p>{license?.clockWarning?"ساعة الجهاز متأخرة عن آخر استخدام مسجل. صحّح التاريخ والساعة ثم افتح البرنامج مجددًا.":license?.trialExpired?"انتهت الفترة التجريبية المجانية. يلزم ملف تفعيل جديد لهذا الجهاز، مؤقت أو دائم.":license?.previouslyActivated?"سبق تفعيل هذا الجهاز. أدخل ملف التفعيل الجديد لاستعادة الدخول.":"أرسل رمز هذا الجهاز لمالك الترخيص، ثم أدخل ملف التفعيل الذي يصدره لك."}</p>
+      {license?.deviceCode&&<><span className="activation-label">رمز الجهاز</span><code className="activation-device-code" dir="ltr">{license.deviceCode}</code><button type="button" onClick={()=>void navigator.clipboard.writeText(license.deviceCode).then(()=>setLicenseError("تم نسخ رمز الجهاز")).catch(()=>setLicenseError("حدد الرمز وانسخه يدويًا"))}>نسخ رمز الجهاز</button></>}
+      <fieldset className="activation-duration"><legend>اختر نوع الصلاحية قبل التفعيل</legend>
+        <label><input type="radio" name="activation-duration" required checked={activationMode==="timed"} onChange={()=>setActivationMode("timed")}/> حتى تاريخ وساعة محددين</label>
+        <label><input type="radio" name="activation-duration" required checked={activationMode==="permanent"} onChange={()=>{setActivationMode("permanent");setActivationExpiry("")}}/> للأبد</label>
+      </fieldset>
+      {activationMode==="timed"&&<label className="activation-expiry-label">تاريخ ووقت انتهاء الصلاحية<input type="datetime-local" required value={activationExpiry} onChange={event=>setActivationExpiry(event.target.value)}/></label>}
+      <label className="activation-label" htmlFor="license-file">استيراد ملف التفعيل</label>
+      <input id="license-file" type="file" accept=".json,application/json" onChange={event=>{const file=event.target.files?.[0];if(file)void file.text().then(content=>{setLicenseText(content);setLicenseError("")}).catch(()=>setLicenseError("تعذر قراءة الملف"))}}/>
+      <textarea aria-label="نص التفعيل" value={licenseText} onChange={event=>setLicenseText(event.target.value)} placeholder="أو الصق نص التفعيل هنا"/>
+      {licenseText.trim()&&licenseExpiryHint(licenseText)&&<p className="activation-license-hint">المدة المذكورة في الملف: <b>{licenseExpiryHint(licenseText)}</b> (تُفحص صحة التوقيع عند التفعيل)</p>}
+      <p className="activation-security-note">يجب أن يطابق اختيارك ملف التفعيل الموقّع. لتغيير المدة، أصدر ملفًا جديدًا بالتاريخ المطلوب.</p>
+      <button type="submit" disabled={licenseBusy||!licenseText.trim()||!activationMode||activationMode==="timed"&&!activationExpiry}>{licenseBusy?"جارٍ التحقق…":"تفعيل"}</button>
+      {licenseError&&<b role="alert">{licenseError}</b>}
+    </form>
+  </main>;
   if(!appAccessChecked)return <main className={`app-lock-shell theme-${appSettings.theme}`}><div className="app-lock-loading">جارٍ تجهيز بيانات المحل…</div></main>;
   if(!appSettings.initialized)return <main className={`app-lock-shell theme-${appSettings.theme}`}><form className="app-lock-card onboarding-card" dir="rtl" onSubmit={event=>void saveAccessSettings(event)}><span className="app-lock-logo">ت</span><small>الإعداد الأول</small><h1>تعريف المحل</h1><p>سجّل بيانات المحل والرمزين مرة واحدة قبل بدء العمل.</p><label><span>اسم المحل</span><input required value={settingsShopName} onChange={event=>setSettingsShopName(event.target.value)} placeholder="أدخل اسم المحل"/></label><label><span>اسم المالك</span><input required value={settingsOwnerName} onChange={event=>setSettingsOwnerName(event.target.value)} placeholder="أدخل اسم المالك"/></label><label><span>اسم المحاسب (يظهر في ترحيب الرئيسية)</span><input required value={settingsAccountantName} onChange={event=>setSettingsAccountantName(event.target.value)} placeholder="أدخل اسم المحاسب"/></label><label><span>رمز دخول التطبيق</span><input required className="numeric" type="password" inputMode="numeric" minLength={4} maxLength={8} value={settingsAppPin} onChange={event=>setSettingsAppPin(latinDigits(event.target.value).replace(/\D/g,"").slice(0,8))} placeholder="4 إلى 8 أرقام"/></label><label><span>رمز المعاملات المالية</span><input required className="numeric" type="password" inputMode="numeric" minLength={4} maxLength={8} value={settingsFinancePin} onChange={event=>setSettingsFinancePin(latinDigits(event.target.value).replace(/\D/g,"").slice(0,8))} placeholder="4 إلى 8 أرقام"/></label>{accessMessage&&<b>{accessMessage}</b>}<button type="submit">حفظ وبدء العمل</button></form></main>;
   if(!appUnlocked)return <main className={`app-lock-shell theme-${appSettings.theme}`}>{appResetMode?<form className="app-lock-card" dir="rtl" onSubmit={event=>{event.preventDefault();void resetProtectedPin("app")}}><span className="app-lock-logo">ت</span><small>استرجاع الدخول</small><h1>رمز دخول جديد</h1><p>تغيير رمز دخول التطبيق فقط</p><input autoFocus className="numeric" type="password" inputMode="numeric" required minLength={4} maxLength={8} value={appResetPin} onChange={event=>setAppResetPin(latinDigits(event.target.value).replace(/\D/g,"").slice(0,8))} placeholder="الرمز الجديد"/><input className="numeric" type="password" inputMode="numeric" required minLength={4} maxLength={8} value={appResetConfirm} onChange={event=>setAppResetConfirm(latinDigits(event.target.value).replace(/\D/g,"").slice(0,8))} placeholder="تأكيد الرمز"/>{appPinError&&<b>{appPinError}</b>}<button type="submit">حفظ الرمز</button><button type="button" onClick={()=>{setAppResetMode(false);setAppResetPin("");setAppResetConfirm("");setAppPinError("")}}>إلغاء</button></form>:<form className="app-lock-card" dir="rtl" onSubmit={event=>void unlockApp(event)}><span className="app-lock-logo">ت</span><small>إدارة التفصيل</small><h1>{appSettings.shopName||"TAILOR"}</h1><p>أدخل رمز الدخول</p><input autoFocus type="password" value={appPinAttempt} onChange={event=>{const value=event.target.value;if(value==="ADMIN"){setAppResetMode(true);setAppPinAttempt("");setAppPinError("")}else setAppPinAttempt(value)}} placeholder="••••" aria-label="رمز دخول التطبيق"/>{appPinError&&<b role="alert">{appPinError}</b>}<button type="submit" disabled={appPinAttempt.length<4}>دخول</button></form>}</main>;
