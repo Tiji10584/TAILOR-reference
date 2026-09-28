@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent,
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { groupMeasurementDrafts } from "./measurementGroups";
+import { isFinalThobeSelected } from "./orderPrintRules";
 
 type Dashboard = { receivedToday:number; tailoredToday:number; readyToDeliver:number };
 type WorkBoardItem = { orderId:number; invoiceNumber:string; customerName:string; customerCode:string; phone:string; deliveryDate:string; quantity:number; status:string };
@@ -156,7 +157,7 @@ export default function App(){
   const [designOptions,setDesignOptions]=useState<DesignOption[]>([]);const [settingsCategory,setSettingsCategory]=useState(defaultCategories[0]);const [optionName,setOptionName]=useState("");const [optionImage,setOptionImage]=useState("");const [settingsError,setSettingsError]=useState("");const [pickerCategory,setPickerCategory]=useState<string|null>(null);const [selectedDesigns,setSelectedDesigns]=useState<Record<string,DesignOption|undefined>>({});
   const [measurements,setMeasurements]=useState<Record<string,string>>(()=>blankFields(measurementFields));const [fabric,setFabric]=useState<Record<string,string>>(()=>blankFields(fabricFields));const [fabricItemId,setFabricItemId]=useState<number|null>(null);const [fabricMeters,setFabricMeters]=useState("");const [fabricQuery,setFabricQuery]=useState("");const [fabricSearchOpen,setFabricSearchOpen]=useState(false);const [unit,setUnit]=useState<"سم"|"إنش">("إنش");const [workerName,setWorkerName]=useState("");const [tailorName,setTailorName]=useState("");const [workers,setWorkers]=useState<WorkerProfile[]>([]);const [thobeSize,setThobeSize]=useState<ThobeSize>("صغير");const [sizeOverride,setSizeOverride]=useState(false);const [cutPrice,setCutPrice]=useState("");const [cutPriceOverride,setCutPriceOverride]=useState(false);const [tailorPrice,setTailorPrice]=useState("");const [tailorPriceOverride,setTailorPriceOverride]=useState(false);const [weight,setWeight]=useState("");const [deliveryDate,setDeliveryDate]=useState(()=>deliveryAfter(5));const [dayCount,setDayCount]=useState("5");const [totalThobes,setTotalThobes]=useState("1");const [thobeType,setThobeType]=useState("سعودي");const [sleeveMode,setSleeveMode]=useState<SleeveMode>("سادة");const [collarMode,setCollarMode]=useState<CollarMode>("قلاب");const [neckButtonCount,setNeckButtonCount]=useState<"1"|"2">("1");const [neckButtonType,setNeckButtonType]=useState<NeckButtonType>("طقطق");const [notes,setNotes]=useState("");const [thobeDrafts,setThobeDrafts]=useState<ThobeDraft[]>(()=>[blankThobe()]);const [currentThobe,setCurrentThobe]=useState(0);
   const [totalPrice,setTotalPrice]=useState("");const [paidAmount,setPaidAmount]=useState("");const [discount,setDiscount]=useState("");const [paymentMethod,setPaymentMethod]=useState("كاش");const [invoice,setInvoice]=useState<InvoiceRecord|null>(null);const [orderLocked,setOrderLocked]=useState(false);const [savingInvoice,setSavingInvoice]=useState(false);const [orderMessage,setOrderMessage]=useState("");const [previewTarget,setPreviewTarget]=useState<PrintTarget|null>(null);
-  const [copySourceOpen,setCopySourceOpen]=useState(false);
+  const [printNavigationWarning,setPrintNavigationWarning]=useState(false);
   const [availablePrinters,setAvailablePrinters]=useState<string[]>([]);
   const [a4Printer,setA4Printer]=useState(()=>window.localStorage.getItem("tailor-a4-printer")||"");
   const [thermalPrinter,setThermalPrinter]=useState(()=>window.localStorage.getItem("tailor-thermal-printer")||"");
@@ -296,7 +297,7 @@ export default function App(){
   function startBlankInvoice(customer:CustomerSearchItem){setCurrentCustomer({id:customer.id,code:customer.code,name:customer.name,phone:customer.phone});setOrderReturnView("customers");resetInvoice();setView("order")}
   function openCustomerInvoice(saved:SavedInvoice,duplicate:boolean){
     if(!selectedCustomer)return;
-    setCopySourceOpen(false);
+    setPrintNavigationWarning(false);
     const {drafts:loadedDrafts,unit:storedUnit}=draftsFromInvoice(saved),drafts=duplicate?loadedDrafts.map(thobe=>({...thobe,workerName:"",cutPrice:"",cutPriceOverride:false})):loadedDrafts,customer={id:selectedCustomer.id,code:selectedCustomer.code,name:selectedCustomer.name,phone:selectedCustomer.phone};
     setCurrentCustomer(customer);setOrderReturnView("customers");setThobeDrafts(drafts);setCurrentThobe(0);applyThobe(drafts[0]);setUnit(storedUnit);setWeight(saved.weight);setTotalThobes(String(drafts.length));
     const usage=Object.fromEntries(Array.from(new Set(drafts.map(item=>item.fabricItemId).filter((id):id is number=>id!==null))).map(id=>[id,drafts.filter(item=>item.fabricItemId===id).reduce((sum,item)=>sum+numericValue(item.fabricMeters),0)]));
@@ -307,10 +308,10 @@ export default function App(){
   function captureThobe():ThobeDraft{return {measurements:{...measurements},fabric:{...fabric},fabricItemId,fabricMeters,designs:{...selectedDesigns},thobeType,sleeveMode,collarMode,neckButtonCount,neckButtonType,workerName,tailorName,sizeCategory:thobeSize,sizeOverride,cutPrice,cutPriceOverride,tailorPrice:tailorPriceOverride||orderLocked&&Boolean(invoice)&&tailorPrice?tailorPrice:String(automaticTailorPrice),tailorPriceOverride,notes}}
   function applyThobe(thobe:ThobeDraft){setMeasurements({...thobe.measurements});setFabric({...thobe.fabric});setFabricItemId(thobe.fabricItemId);setFabricMeters(thobe.fabricMeters);setFabricQuery(thobe.fabric["اسم القماش"]||"");setFabricSearchOpen(false);setSelectedDesigns({...thobe.designs});setThobeType(thobe.thobeType);setSleeveMode(thobe.sleeveMode);setCollarMode(thobe.collarMode);setNeckButtonCount(thobe.neckButtonCount);setNeckButtonType(thobe.neckButtonType);setWorkerName(thobe.workerName||"");setTailorName(thobe.tailorName||"");setThobeSize(thobe.sizeCategory||autoThobeSize(thobe.measurements,unit));setSizeOverride(Boolean(thobe.sizeOverride));setCutPrice(thobe.cutPrice||"");setCutPriceOverride(Boolean(thobe.cutPriceOverride));setTailorPrice(thobe.tailorPrice||"");setTailorPriceOverride(Boolean(thobe.tailorPriceOverride));setNotes(thobe.notes)}
   function completeThobeDrafts(count=Math.max(1,Number(totalThobes)||1)){const next=Array.from({length:count},(_,index)=>thobeDrafts[index]?cloneThobe(thobeDrafts[index]):blankThobe());if(currentThobe<count)next[currentThobe]=captureThobe();return next}
-  function resetInvoice(){const first=blankThobe();applyThobe(first);setThobeDrafts([first]);setCurrentThobe(0);setUnit("إنش");setWeight("");setDeliveryDate(deliveryAfter(5));setDayCount("5");setTotalThobes("1");setTotalPrice("");setPaidAmount("");setDiscount("");setPaymentMethod("كاش");setInvoice(null);setSavedFabricUsage({});setConfirmLowStock(false);setOrderLocked(false);setOrderMessage("");setCopySourceOpen(false)}
+  function resetInvoice(){const first=blankThobe();applyThobe(first);setThobeDrafts([first]);setCurrentThobe(0);setUnit("إنش");setWeight("");setDeliveryDate(deliveryAfter(5));setDayCount("5");setTotalThobes("1");setTotalPrice("");setPaidAmount("");setDiscount("");setPaymentMethod("كاش");setInvoice(null);setSavedFabricUsage({});setConfirmLowStock(false);setOrderLocked(false);setOrderMessage("");setPrintNavigationWarning(false)}
   function changeDeliveryDate(value:string){setDeliveryDate(value);if(!value){setDayCount("0");return}const delivery=new Date(`${value}T00:00:00`),todayDate=new Date();todayDate.setHours(0,0,0,0);setDayCount(String(Math.max(0,Math.ceil((delivery.getTime()-todayDate.getTime())/86400000))))}
   function changeDayCount(value:string){const normalized=latinDigits(value).replace(/[^0-9]/g,"");setDayCount(normalized);if(normalized===""){setDeliveryDate("");return}const delivery=new Date();delivery.setHours(0,0,0,0);delivery.setDate(delivery.getDate()+Number(normalized));setDeliveryDate(dateInputValue(delivery))}
-  function changeTotalThobes(value:string){const count=Math.min(20,Math.max(1,Number(latinDigits(value).replace(/[^0-9]/g,""))||1));const next=completeThobeDrafts(count);const target=Math.min(currentThobe,count-1);setTotalThobes(String(count));setThobeDrafts(next);if(target!==currentThobe){setCurrentThobe(target);applyThobe(next[target])}}
+  function changeTotalThobes(value:string){const count=Math.min(20,Math.max(1,Number(latinDigits(value).replace(/[^0-9]/g,""))||1));const next=completeThobeDrafts(count);const target=Math.min(currentThobe,count-1);setTotalThobes(String(count));setThobeDrafts(next);setPrintNavigationWarning(false);if(target!==currentThobe){setCurrentThobe(target);applyThobe(next[target])}}
   function moveBetweenNumberFields(event:KeyboardEvent<HTMLElement>){
     const target=event.target;
     if(!(target instanceof HTMLInputElement)||!target.classList.contains("numeric"))return;
@@ -322,19 +323,8 @@ export default function App(){
     if(current<0||!next)return;
     event.preventDefault();next.focus();if(next.type!=="date")next.select();
   }
-  function switchThobe(index:number){if(index===currentThobe)return;const next=completeThobeDrafts();setThobeDrafts(next);setCurrentThobe(index);applyThobe(next[index]||blankThobe());setOrderMessage("");setCopySourceOpen(false)}
-  function copyThobeFrom(sourceIndex:number){
-    if(orderLocked||sourceIndex===currentThobe||sourceIndex<0||sourceIndex>=Number(totalThobes))return;
-    const next=completeThobeDrafts(),copied=cloneThobe(next[sourceIndex]);
-    next[currentThobe]=copied;setThobeDrafts(next);applyThobe(copied);
-    setCopySourceOpen(false);setOrderMessage(`تم نسخ مقاسات الثوب ${sourceIndex+1} إلى الثوب ${currentThobe+1}`);
-  }
-  function requestThobeCopy(){
-    if(orderLocked)return;
-    const sources=completeThobeDrafts().map((_,index)=>index).filter(index=>index!==currentThobe);
-    if(sources.length===1)copyThobeFrom(sources[0]);
-    else if(sources.length>1)setCopySourceOpen(true);
-  }
+  function switchThobe(index:number){if(index===currentThobe)return;const next=completeThobeDrafts();setThobeDrafts(next);setCurrentThobe(index);applyThobe(next[index]||blankThobe());setOrderMessage("");setPrintNavigationWarning(false)}
+  function copyPreviousThobe(){if(currentThobe===0)return;const next=completeThobeDrafts();const copied=cloneThobe(next[currentThobe-1]);next[currentThobe]=copied;setThobeDrafts(next);applyThobe(copied);setOrderMessage(`تم نسخ مقاسات الثوب ${currentThobe}`)}
   async function saveInvoice():Promise<boolean>{
     if(!currentCustomer)return false;
     try{
@@ -421,7 +411,13 @@ export default function App(){
   function exitWithoutSave(){const destination=orderReturnView;setCurrentCustomer(null);resetInvoice();setView(destination)}
   async function saveAndExit(){if(!orderLocked){const saved=await saveInvoice();if(!saved)return}const destination=orderReturnView;setCurrentCustomer(null);setView(destination);await load();if(destination==="customers"){await searchCustomerRecords(customerQuery);if(selectedCustomer)await selectCustomerRecord(selectedCustomer)}}
   async function ensureInvoiceSaved(){if(invoice&&orderLocked)return true;return saveInvoice()}
-  async function openPrintPreview(target:PrintTarget){if(await ensureInvoiceSaved())setPreviewTarget(target)}
+  async function openPrintPreview(target:PrintTarget){
+    if(view==="order"&&["measurements","receipt","laundry"].includes(target)&&!isFinalThobeSelected(currentThobe,Number(totalThobes))){
+      setPrintNavigationWarning(true);return;
+    }
+    setPrintNavigationWarning(false);
+    if(await ensureInvoiceSaved())setPreviewTarget(target);
+  }
   async function selectImage(event:ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];if(!file)return;try{setOptionImage(await imageFromFile(file));setSettingsError("")}catch{setSettingsError("تعذر قراءة الصورة.")}}
   async function addDesignOption(event:FormEvent<HTMLFormElement>){event.preventDefault();if(!settingsCategory.trim()||!optionName.trim()||!optionImage){setSettingsError("اكتب اسم النوع واختر صورته.");return}try{await invoke("add_design_option",{category:settingsCategory.trim(),name:optionName.trim(),imageData:optionImage});setOptionName("");setOptionImage("");setSettingsError("");await loadDesignOptions()}catch{setSettingsError("تعذر حفظ النوع والصورة.")}}
   async function chooseStorage(mode:"copy"|"use"){
@@ -700,6 +696,12 @@ export default function App(){
     {view==="order"&&currentCustomer&&<section className="order-page compact-order" dir="rtl" onKeyDown={moveBetweenNumberFields}>
       <div className="compact-order-head"><div><span>{invoice?"فاتورة محفوظة":"فاتورة جديدة"}</span><h1>مقاسات الثوب</h1></div><div className="compact-head-actions"><button type="button" onClick={()=>setView("settings")}>الإعدادات والصور</button><button className="save-exit" type="button" disabled={savingInvoice||(!orderLocked&&fabricSaveBlocked)} onClick={()=>void saveAndExit()}>{orderLocked?"تم الحفظ — خروج":"حفظ وخروج"}</button><button className="discard-exit" type="button" onClick={exitWithoutSave}>خروج بدون حفظ</button></div></div>
 
+      {printNavigationWarning&&<div className="order-print-warning" role="alert">
+        <div><strong>انتقل إلى الثوب الأخير قبل الطباعة</strong><p>أنت على الثوب {currentThobe+1} من {totalThobes}. لم تبدأ الطباعة. انتقل إلى الثوب {totalThobes} ثم اضغط زر الطباعة من جديد لطباعة جميع الثياب.</p></div>
+        <button type="button" onClick={()=>switchThobe(Number(totalThobes)-1)}>اذهب إلى الثوب {totalThobes}</button>
+        <button type="button" onClick={()=>setPrintNavigationWarning(false)}>إغلاق</button>
+      </div>}
+
 
       <section className="measurement-setup-bar">
         <div className="measurement-setup-card unit-card"><span>وحدة القياس</span><div className="unit-switch"><button type="button" className={unit==="إنش"?"selected":""} disabled={orderLocked} onClick={()=>changeMeasurementUnit("إنش")}>إنش</button><button type="button" className={unit==="سم"?"selected":""} disabled={orderLocked} onClick={()=>changeMeasurementUnit("سم")}>سم</button></div><small>اختيار الوحدة لهذا المقاس</small></div>
@@ -724,16 +726,7 @@ export default function App(){
         <label className="thobe-count-field"><span>عدد الثياب</span><div className="number-stepper"><input className="numeric" type="number" min="1" max="20" step="1" data-count-stepper="true" disabled={orderLocked} value={totalThobes} onChange={event=>changeTotalThobes(event.target.value)}/><span className="stepper-arrows"><button type="button" tabIndex={-1} disabled={orderLocked||Number(totalThobes)>=20} onClick={()=>changeTotalThobes(String(Number(totalThobes)+1))} aria-label="زيادة عدد الثياب">▲</button><button type="button" tabIndex={-1} disabled={orderLocked||Number(totalThobes)<=1} onClick={()=>changeTotalThobes(String(Number(totalThobes)-1))} aria-label="تقليل عدد الثياب">▼</button></span></div></label>
       </section>
 
-      <nav className="thobe-steps" aria-label="الثياب في الفاتورة"><span>الثوب الحالي</span>{outputDrafts.map((_,index)=><button type="button" key={index} className={currentThobe===index?"selected":""} onClick={()=>switchThobe(index)}>الثوب <b className="numeric">{index+1}</b></button>)}{outputDrafts.length>1&&!orderLocked&&<button className="copy-step" type="button" onClick={requestThobeCopy}>نسخ مقاسات من ثوب آخر</button>}</nav>
-
-      {copySourceOpen&&<div className="copy-source-overlay" onMouseDown={()=>setCopySourceOpen(false)}>
-        <section className="copy-source-dialog" role="dialog" aria-modal="true" aria-labelledby="copy-source-title" dir="rtl" onMouseDown={event=>event.stopPropagation()}>
-          <h2 id="copy-source-title">اختر مصدر المقاسات للثوب {currentThobe+1}</h2>
-          <p>اختر الثوب الذي تريد نسخ مقاساته وتفاصيله إلى الثوب الحالي.</p>
-          <div className="copy-source-options">{outputDrafts.map((thobe,index)=>index!==currentThobe&&<button type="button" key={index} onClick={()=>copyThobeFrom(index)}><strong>الثوب {index+1}</strong><span>{thobe.thobeType} · {thobe.sleeveMode} · {thobe.collarMode}</span></button>)}</div>
-          <button className="copy-source-cancel" type="button" onClick={()=>setCopySourceOpen(false)}>إلغاء</button>
-        </section>
-      </div>}
+      <nav className="thobe-steps" aria-label="الثياب في الفاتورة"><span>الثوب الحالي</span>{outputDrafts.map((_,index)=><button type="button" key={index} className={currentThobe===index?"selected":""} onClick={()=>switchThobe(index)}>الثوب <b className="numeric">{index+1}</b></button>)}{currentThobe>0&&!orderLocked&&<button className="copy-step" type="button" onClick={copyPreviousThobe}>نسخ مقاسات الثوب السابق</button>}</nav>
 
       <section className="measure-columns">
         <article className="measure-column body-column"><header><span>01</span><h2>الثوب والجسم</h2></header>{photoPicker("نوع الثوب","أضف صورة نوع الثوب")}<label className="compact-select"><span>نوع الثوب</span><select disabled={orderLocked} value={thobeType} onChange={event=>changeThobeType(event.target.value)}>{thobeTypes.map(type=><option key={type}>{type}</option>)}</select></label><div className="vertical-fields">{bodyLengthInput()}{bodySingleFields.map(field=>measurementInput(field))}</div></article>
