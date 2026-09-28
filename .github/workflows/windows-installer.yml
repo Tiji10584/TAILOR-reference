@@ -69,6 +69,6 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release upload v0.2.4 "$installer" --clobber
           } else {
-            gh release create v0.2.4 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.4' --notes 'Make printed measurement headings black, group equivalent thobes into one sheet per measurement set, and choose the source when copying measurements among multiple thobes. Preserves the existing printing formats, offline activation, and shop data.'
+            gh release create v0.2.4 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.4' --notes 'Make printed measurement headings black, group equivalent thobes into one sheet per measurement set, and show a prominent warning before printing from a garment other than the last. Preserves the existing printing formats, offline activation, and shop data.'
           }
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the installer.' }
