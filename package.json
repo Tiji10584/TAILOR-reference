@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run icons && tsc && vite build",
-    "test:measurements": "node --experimental-strip-types --test tests/measurementGroups.test.mjs",
+    "test:measurements": "node --experimental-strip-types --test tests/measurementGroups.test.mjs tests/orderPrintRules.test.mjs",
     "icons": "tauri icon assets/tailor-icon.svg",
     "tauri": "tauri"
   },
