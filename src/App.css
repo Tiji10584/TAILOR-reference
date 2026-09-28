@@ -4922,3 +4922,41 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
  html[data-print-target="receipt"] .print-area .receipt-thobes{grid-template-columns:1fr!important}
  html[data-print-target="receipt"] .print-area .receipt-thobes>p{grid-template-columns:auto 1fr!important}
 }
+
+/* Readable even when the printer ignores background graphics or prints in grayscale. */
+.measurement-paper .paper-work-card>h3,
+.preview-dialog .measurement-paper .paper-work-card>h3,
+.print-area .measurement-paper .paper-work-card>h3{
+  color:#000!important;
+  background:#fff!important;
+  border:0!important;
+  border-bottom:2px solid #000!important;
+  font-weight:900!important;
+}
+@media print{
+  .measurement-paper .paper-work-card>h3,
+  html[data-print-target="measurements"] .print-area .measurement-paper .paper-work-card>h3{
+    color:#000!important;
+    background:#fff!important;
+    background-color:#fff!important;
+    border-bottom:2px solid #000!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+}
+
+/* Always visible above the order form when printing from a non-final garment. */
+.order-print-warning{
+  position:fixed;top:16px;left:50%;z-index:120;
+  width:min(760px,calc(100vw - 24px));
+  display:flex;align-items:center;gap:12px;padding:16px;
+  border:2px solid #b94d36;border-radius:14px;
+  color:#232a33;background:#fff;box-shadow:0 20px 55px #0009;
+  transform:translateX(-50%);
+}
+.order-print-warning div{flex:1;min-width:0}
+.order-print-warning strong{display:block;font-size:19px}
+.order-print-warning p{margin:5px 0 0;font-size:15px;line-height:1.55}
+.order-print-warning button{flex:0 0 auto;padding:10px 12px;border:1px solid #596473;border-radius:8px;color:#fff;background:#3d4652;font:inherit;font-weight:700;cursor:pointer}
+.order-print-warning button:last-child{color:#232a33;background:#fff}
+@media(max-width:600px){.order-print-warning{top:8px;flex-wrap:wrap}.order-print-warning div{flex:0 0 100%}.order-print-warning button{flex:1}}
