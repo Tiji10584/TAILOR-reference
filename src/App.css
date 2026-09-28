@@ -4922,3 +4922,35 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
  html[data-print-target="receipt"] .print-area .receipt-thobes{grid-template-columns:1fr!important}
  html[data-print-target="receipt"] .print-area .receipt-thobes>p{grid-template-columns:auto 1fr!important}
 }
+
+/* Readable even when the printer ignores background graphics or prints in grayscale. */
+.measurement-paper .paper-work-card>h3,
+.preview-dialog .measurement-paper .paper-work-card>h3,
+.print-area .measurement-paper .paper-work-card>h3{
+  color:#000!important;
+  background:#fff!important;
+  border:0!important;
+  border-bottom:2px solid #000!important;
+  font-weight:900!important;
+}
+@media print{
+  .measurement-paper .paper-work-card>h3,
+  html[data-print-target="measurements"] .print-area .measurement-paper .paper-work-card>h3{
+    color:#000!important;
+    background:#fff!important;
+    background-color:#fff!important;
+    border-bottom:2px solid #000!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+}
+
+.copy-source-overlay{position:fixed;inset:0;z-index:115;display:grid;place-items:center;padding:18px;background:#000a}
+.copy-source-dialog{width:min(480px,100%);display:grid;gap:12px;padding:24px;border:1px solid #737c88;border-radius:18px;color:#222b34;background:#fff;box-shadow:0 22px 65px #0009}
+.copy-source-dialog h2{margin:0;font-size:21px}
+.copy-source-dialog p{margin:0;color:#46515e;line-height:1.5}
+.copy-source-options{display:grid;gap:9px;max-height:45vh;overflow-y:auto}
+.copy-source-options button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:13px 14px;border:1px solid #737c88;border-radius:10px;color:#222b34;background:#f5f6f8;font:inherit;text-align:right;cursor:pointer}
+.copy-source-options button:hover,.copy-source-options button:focus-visible{border-color:#2d3743;background:#e8edf2}
+.copy-source-options span{color:#46515e}
+.copy-source-cancel{justify-self:start;padding:10px 16px;border:1px solid #737c88;border-radius:8px;color:#222b34;background:#fff;font:inherit;cursor:pointer}
