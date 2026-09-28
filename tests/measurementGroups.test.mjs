@@ -25,10 +25,15 @@ test("matching thobes stay together even if they are not adjacent",()=>{
 test("one different value shown on the sheet creates a separate sheet",()=>{
   assert.equal(groupMeasurementDrafts([first,{...first,tailorName:"علي"}]).length,2);
   assert.equal(groupMeasurementDrafts([first,{...first,designs:{"نوع الثوب":{id:2}}}]).length,2);
+  assert.equal(groupMeasurementDrafts([first,{...first,fabricUnit:"ياردة"}]).length,2);
 });
 
 test("field insertion order does not create an extra page",()=>{
   const firstWithTwoFields={...first,measurements:{"طول أمام":"55","طول خلف":"56"}};
   const sameWithReverseOrder={...first,measurements:{"طول خلف":"56","طول أمام":"55"}};
   assert.deepEqual(groupMeasurementDrafts([firstWithTwoFields,sameWithReverseOrder]).map(group=>group.indices),[[0,1]]);
+});
+
+test("an older invoice without a unit still groups with meter invoices",()=>{
+  assert.deepEqual(groupMeasurementDrafts([first,{...first,fabricUnit:"متر"}]).map(group=>group.indices),[[0,1]]);
 });

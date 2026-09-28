@@ -188,7 +188,7 @@ struct DailyReport{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct AppSettings{shop_name:String,owner_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String,initialized:bool,large_cut_price:f64,small_cut_price:f64}
+struct AppSettings{shop_name:String,owner_name:String,accountant_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String,initialized:bool,large_cut_price:f64,small_cut_price:f64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -962,7 +962,10 @@ fn list_supplier_ledger(app:AppHandle,supplier_id:i64)->Result<Vec<SupplierLedge
     SELECT 'supply' AS source_type,m.id AS source_id,f.supplier_id AS supplier_id,
            'توريد قماش' AS entry_type,
            f.name || CASE WHEN trim(f.color)<>'' THEN ' — ' || f.color ELSE '' END AS title,
-           m.movement_type || ' · ' || printf('%.2f متر',m.meters) ||
+           m.movement_type || ' · ' || CASE m.entry_unit
+             WHEN 'ياردة' THEN printf('%.2f ياردة',m.meters/0.9144)
+             WHEN 'كرتون' THEN printf('%.2f كرتون × %.2f متر',m.carton_count,m.meters_per_carton)
+             ELSE printf('%.2f متر',m.meters) END ||
              CASE WHEN trim(m.notes)<>'' THEN ' · ' || m.notes ELSE '' END AS details,
            m.total_cost AS amount,m.created_at AS created_at
     FROM fabric_movements m
@@ -1093,8 +1096,29 @@ fn supply_calculation(entry_unit:&str,meter_quantity:f64,carton_count:f64,meters
   let unit_cost=if meters>0.0{total_cost/meters}else{0.0};
   return Ok((meters,unit_cost,total_cost,"كرتون".into()))
  }
- if !meter_quantity.is_finite()||meter_quantity<=0.0{return Err("أدخل كمية القماش بالمتر".into())}
- Ok((meter_quantity,purchase_amount,meter_quantity*purchase_amount,"متر".into()))
+ let normalized_unit=entry_unit.trim();
+ if normalized_unit!="متر"&&normalized_unit!="ياردة"{return Err("اختر وحدة القماش: متر أو ياردة أو كرتون".into())}
+ if !meter_quantity.is_finite()||meter_quantity<=0.0{return Err(format!("أدخل كمية القماش بوحدة {normalized_unit}"))}
+ let meters=if normalized_unit=="ياردة"{meter_quantity*0.9144}else{meter_quantity};
+ if !meters.is_finite()||!purchase_amount.is_finite()||(meter_quantity*purchase_amount).is_infinite(){return Err("كمية القماش أو سعره غير صحيح".into())}
+ Ok((meters,(meter_quantity*purchase_amount)/meters,meter_quantity*purchase_amount,normalized_unit.into()))
+}
+
+#[cfg(test)]
+mod fabric_unit_tests{
+ use super::supply_calculation;
+ #[test]
+ fn yard_purchase_preserves_cost_and_converts_stock_to_meters(){
+  let (meters,cost_per_meter,total,unit)=supply_calculation("ياردة",100.0,0.0,0.0,10.0).unwrap();
+  assert!((meters-91.44).abs()<1e-9);
+  assert!((total-1000.0).abs()<1e-9);
+  assert!((cost_per_meter*meters-total).abs()<1e-9);
+  assert_eq!(unit,"ياردة");
+ }
+ #[test]
+ fn invalid_unit_does_not_enter_inventory(){
+  assert!(supply_calculation("قدم",100.0,0.0,0.0,10.0).is_err());
+ }
 }
 
 #[tauri::command]
@@ -1268,21 +1292,22 @@ fn get_app_settings(app:AppHandle)->Result<AppSettings,String>{
  let finance_pin=value("finance_pin");
  let app_pin=value("app_pin");
  let saved_theme=value("theme");
- let shop_name=value("shop_name");let owner_name=value("owner_name");
+ let shop_name=value("shop_name");let owner_name=value("owner_name");let accountant_name=value("accountant_name");
  let large_cut_price=value("large_cut_price").parse::<f64>().ok().filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(30.0);
  let small_cut_price=value("small_cut_price").parse::<f64>().ok().filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(25.0);
  let initialized=!shop_name.trim().is_empty()&&!owner_name.trim().is_empty()&&!finance_pin.is_empty()&&!app_pin.is_empty();
- Ok(AppSettings{shop_name,owner_name,finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()},initialized,large_cut_price,small_cut_price})
+ Ok(AppSettings{shop_name,owner_name,accountant_name,finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()},initialized,large_cut_price,small_cut_price})
 }
 
 #[tauri::command]
-fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,finance_pin:String,app_pin:String)->Result<AppSettings,String>{
+fn save_app_settings(app:AppHandle,shop_name:String,owner_name:String,accountant_name:String,finance_pin:String,app_pin:String)->Result<AppSettings,String>{
  let pin=finance_pin.trim();let entry_pin=app_pin.trim();
  if !pin.is_empty()&&(pin.len()<4||pin.len()>8||!pin.chars().all(|character|character.is_ascii_digit())){return Err("رمز المالية يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
  if !entry_pin.is_empty()&&(entry_pin.len()<4||entry_pin.len()>8||!entry_pin.chars().all(|character|character.is_ascii_digit())){return Err("رمز دخول التطبيق يجب أن يكون من 4 إلى 8 أرقام إنجليزية".into())}
  let conn=db(&app)?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('shop_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[shop_name.trim()]).map_err(|e|e.to_string())?;
  conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('owner_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[owner_name.trim()]).map_err(|e|e.to_string())?;
+ conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('accountant_name',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[accountant_name.trim()]).map_err(|e|e.to_string())?;
  if !pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('finance_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[pin]).map_err(|e|e.to_string())?;}
  if !entry_pin.is_empty(){conn.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES('app_pin',?1) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",[entry_pin]).map_err(|e|e.to_string())?;}
  get_app_settings(app)

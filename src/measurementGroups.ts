@@ -3,6 +3,7 @@ export type PrintableThobe={
   fabric:Record<string,string>;
   fabricItemId:number|null;
   fabricMeters:string;
+  fabricUnit?:"متر"|"ياردة";
   designs:Record<string,{id:number}|undefined>;
   thobeType:string;
   sleeveMode:string;
@@ -23,7 +24,7 @@ export function measurementSheetKey(thobe:PrintableThobe):string{
     .map(([category,option])=>[category,option.id]));
   return JSON.stringify({
     measurements:ordered(thobe.measurements),fabric:ordered(thobe.fabric),fabricItemId:thobe.fabricItemId,
-    fabricMeters:thobe.fabricMeters,designs,thobeType:thobe.thobeType,
+    fabricMeters:thobe.fabricMeters,fabricUnit:thobe.fabricUnit||"متر",designs,thobeType:thobe.thobeType,
     sleeveMode:thobe.sleeveMode,collarMode:thobe.collarMode,
     neckButtonCount:thobe.neckButtonCount,neckButtonType:thobe.neckButtonType,
     tailorName:thobe.tailorName,sizeCategory:thobe.sizeCategory,notes:thobe.notes
