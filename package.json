@@ -1,11 +1,12 @@
 {
   "name": "tailor-workspace",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "npm run icons && tsc && vite build",
+    "test:measurements": "node --experimental-strip-types --test tests/measurementGroups.test.mjs",
     "icons": "tauri icon assets/tailor-icon.svg",
     "tauri": "tauri"
   },
