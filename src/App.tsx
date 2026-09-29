@@ -530,14 +530,15 @@ export default function App(){
       supplier:".supplier-payment-sheet",supply:".supply-entry-sheet",finance:".financial-entry-sheet"
     };
     const thermal=target==="receipt"||target==="laundry";
+    const halfA4Measurement=target==="measurements";
     const source=document.querySelector<HTMLElement>(`.print-area ${selectors[target]}`);
     if(!source?.querySelector(".paper")&&!source?.classList.contains("paper"))return;
     if("__TAURI_INTERNALS__" in window){
       if(document.documentElement.hasAttribute("data-print-target"))return;
       const slips=Array.from(document.querySelectorAll<HTMLElement>(".preview-sheets .receipt-paper"));
-      const pageHeightMm=thermal?Math.max(80,...slips.map(paper=>Math.ceil(Math.max(paper.scrollHeight,paper.getBoundingClientRect().height)*25.4/96)+18)):297;
+      const pageHeightMm=thermal?Math.max(80,...slips.map(paper=>Math.ceil(Math.max(paper.scrollHeight,paper.getBoundingClientRect().height)*25.4/96)+18)):(halfA4Measurement?148.5:297);
       const pageRule=document.createElement("style");
-      pageRule.textContent=`@page{size:${thermal?`80mm ${pageHeightMm}mm`:"210mm 297mm"};margin:0}`;
+      pageRule.textContent=`@page{size:${thermal?`80mm ${pageHeightMm}mm`:halfA4Measurement?"210mm 148.5mm":"210mm 297mm"};margin:0}`;
       document.head.appendChild(pageRule);
       document.documentElement.dataset.printTarget=target;
       try{
@@ -556,7 +557,7 @@ export default function App(){
     }
     const frame=document.createElement("iframe");
     frame.title=`طباعة ${target}`;
-    frame.style.cssText=`position:fixed;left:-10000px;top:0;width:${thermal?"80mm":"210mm"};height:297mm;border:0;opacity:0;pointer-events:none`;
+    frame.style.cssText=`position:fixed;left:-10000px;top:0;width:${thermal?"80mm":"210mm"};height:${halfA4Measurement?"148.5mm":"297mm"};border:0;opacity:0;pointer-events:none`;
     document.body.appendChild(frame);
     const printDocument=frame.contentDocument,printWindow=frame.contentWindow;
     if(!printDocument||!printWindow){frame.remove();return}
@@ -586,9 +587,9 @@ export default function App(){
       .print-area .receipt-thobes>p{display:grid!important;grid-template-columns:auto 1fr!important;gap:1mm!important;margin:0!important;padding:1mm!important;border:1px solid #777!important;overflow-wrap:anywhere!important}
       .print-area .receipt-thobes>p>span{text-align:right!important}
       @media print{.print-area .paper:not(:last-child){break-after:page!important;page-break-after:always!important}}
-    `:`@page{size:210mm 297mm;margin:0}
+    `:`@page{size:${halfA4Measurement?"210mm 148.5mm":"210mm 297mm"};margin:0}
       @media print{
-        html,body{width:210mm!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
+        html,body{width:210mm!important;height:${halfA4Measurement?"148.5mm":"auto"}!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
         .app-shell{width:210mm!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
         .print-area{display:block!important;width:210mm!important;margin:0!important;padding:0!important}
         .print-area .paper{display:block!important;page:auto!important;width:208mm!important;height:146mm!important;min-height:146mm!important;max-height:146mm!important;margin:0 auto!important;border:0!important;border-radius:0!important;box-shadow:none!important;transform:none!important;break-inside:avoid!important;page-break-inside:avoid!important}
