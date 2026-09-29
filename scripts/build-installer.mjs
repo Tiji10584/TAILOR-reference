@@ -8,9 +8,9 @@ import { spawnSync } from "node:child_process";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const flags = new Set(process.argv.slice(2));
-const supported = new Set(["--metadata", "--publish", "--verify-install"]);
+const supported = new Set(["--metadata", "--check", "--publish", "--verify-install"]);
 if ([...flags].some(flag => !supported.has(flag))) {
-  throw new Error("Usage: node scripts/build-installer.mjs [--metadata] [--publish] [--verify-install]");
+  throw new Error("Usage: node scripts/build-installer.mjs [--metadata] [--check] [--publish] [--verify-install]");
 }
 
 function execute(program, args, options = {}) {
@@ -44,12 +44,19 @@ const version = packageVersion;
 const tag = `v${version}`;
 console.log(`TAILOR ${version} — ${tag}`);
 if (flags.has("--metadata")) process.exit(0);
+const hasGit = existsSync(join(root, ".git"));
+let commit = null;
+if (hasGit) {
+  commit = capture("git", ["rev-parse", "HEAD"]);
+  const dirty = capture("git", ["status", "--porcelain", "--untracked-files=no"]);
+  if (dirty) throw new Error("Tracked project files have local changes. Commit or review them before building a release.");
+  console.log(`Source commit: ${commit}`);
+} else {
+  if (flags.has("--publish")) throw new Error("Publishing requires a Git checkout. Build this copied source locally without --publish.");
+  console.log("Copied source folder without Git; building the version shown above locally.");
+}
+if (flags.has("--check")) process.exit(0);
 if (process.platform !== "win32") throw new Error("Build the Windows installer on a Windows computer.");
-
-const commit = capture("git", ["rev-parse", "HEAD"]);
-const dirty = capture("git", ["status", "--porcelain", "--untracked-files=no"]);
-if (dirty) throw new Error("Tracked project files have local changes. Commit or review them before building a release.");
-console.log(`Source commit: ${commit}`);
 
 if (flags.has("--publish")) {
   execute("gh", ["auth", "status"]);
