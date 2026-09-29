@@ -1014,7 +1014,7 @@ button{font:inherit}
 /* ---------- Reports ---------- */
 .report-filter{
   display:grid!important;
-  grid-template-columns:minmax(220px,1.35fr) minmax(170px,.8fr) minmax(190px,1fr) auto auto!important;
+  grid-template-columns:minmax(220px,1.35fr) minmax(170px,.8fr) minmax(170px,.8fr) auto auto!important;
   align-items:end!important;
   gap:10px!important;
   padding:14px!important;

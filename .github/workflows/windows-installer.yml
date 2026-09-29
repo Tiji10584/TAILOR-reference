@@ -73,10 +73,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName
-          gh release view v0.2.8 *> $null
+          gh release view v0.2.9 *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload v0.2.8 "$installer" --clobber
+            gh release upload v0.2.9 "$installer" --clobber
           } else {
-            gh release create v0.2.8 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.8' --notes 'Warn and require explicit acknowledgement before saving or printing with insufficient fabric; keep full deduction in meters, which may create a negative stock balance. Show a centered warning for a missing tailor. Default new thobe fabric quantities to yards while preserving existing invoice units and meter-based inventory. The Windows installer is verified by silent installation.'
+            gh release create v0.2.9 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.9' --notes 'Count invoice debt when payment or discount is blank; refresh dashboard counts and record direct tailoring transitions consistently. Support inclusive custom financial report date ranges and test all three calculations. The Windows installer is verified by silent installation.'
           }
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the installer.' }

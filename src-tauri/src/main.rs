@@ -182,7 +182,7 @@ struct FinancialOverview{
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct DailyReport{
- report_date:String,period:String,period_label:String,new_customers:i64,invoices:i64,thobes:i64,invoice_sales:f64,invoice_received:f64,
+ report_date:String,end_date:String,period:String,period_label:String,new_customers:i64,invoices:i64,thobes:i64,invoice_sales:f64,invoice_received:f64,
  extra_income:f64,expenses:f64,delivered:i64,fabric_used:f64,fabric_sold:f64
 }
 
@@ -667,6 +667,10 @@ fn set_storage_location(app:AppHandle,state:tauri::State<SessionState>,folder:St
 #[tauri::command]
 fn dashboard_summary(app:AppHandle)->Result<Dashboard,String>{
  let conn=db(&app)?;
+ dashboard_from_connection(&conn)
+}
+
+fn dashboard_from_connection(conn:&Connection)->Result<Dashboard,String>{
  let received_today=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE received_date=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let tailored_today=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE tailored_date=date('now','localtime')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let ready_to_deliver=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE work_status='في المحل بانتظار التسليم'",[],|row|row.get(0)).map_err(|e|e.to_string())?;
@@ -690,6 +694,16 @@ fn work_board(app:AppHandle)->Result<Vec<WorkBoardItem>,String>{
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
+fn update_order_stage(conn:&Connection,order_id:i64,status:&str)->Result<(),String>{
+ conn.execute(
+  "UPDATE orders SET work_status=?1,
+   tailored_date=CASE WHEN ?1 IN ('انتظار القص','عند الخياط') THEN NULL WHEN tailored_date IS NULL THEN date('now','localtime') ELSE tailored_date END,
+   delivered_at=CASE WHEN ?1='تم التسليم' THEN COALESCE(delivered_at,datetime('now','localtime')) ELSE NULL END
+   WHERE id=?2",params![status,order_id]
+ ).map_err(|e|e.to_string())?;
+ Ok(())
+}
+
 #[tauri::command]
 fn advance_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
  let conn=db(&app)?;
@@ -702,11 +716,7 @@ fn advance_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
   "تم التسليم"=>return Ok(()),
   _=>return Err("حالة الثوب غير معروفة".into()),
  };
- conn.execute(
-  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN ?1='في المغسلة' AND tailored_date IS NULL THEN date('now','localtime') ELSE tailored_date END,delivered_at=CASE WHEN ?1='تم التسليم' THEN datetime('now','localtime') ELSE delivered_at END WHERE id=?2",
-  params![next,order_id]
- ).map_err(|e|e.to_string())?;
- Ok(())
+ update_order_stage(&conn,order_id,next)
 }
 
 #[tauri::command]
@@ -721,11 +731,7 @@ fn retreat_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
   "تم التسليم"=>"في المحل بانتظار التسليم",
   _=>return Err("حالة الثوب غير معروفة".into()),
  };
- conn.execute(
-  "UPDATE orders SET work_status=?1,tailored_date=CASE WHEN work_status='في المغسلة' AND ?1='عند الخياط' THEN NULL ELSE tailored_date END,delivered_at=CASE WHEN work_status='تم التسليم' THEN NULL ELSE delivered_at END WHERE id=?2",
-  params![previous,order_id]
- ).map_err(|e|e.to_string())?;
- Ok(())
+ update_order_stage(&conn,order_id,previous)
 }
 
 #[tauri::command]
@@ -734,7 +740,7 @@ fn move_orders_to_status(app:AppHandle,order_ids:Vec<i64>,status:String)->Result
  if !allowed.contains(&status.as_str()){return Err("مرحلة العمل غير صحيحة".into())}
  if order_ids.is_empty(){return Err("حدد ثوبًا واحدًا على الأقل".into())}
  let mut conn=db(&app)?;let transaction=conn.transaction().map_err(|e|e.to_string())?;
- for order_id in order_ids.iter(){transaction.execute("UPDATE orders SET work_status=?1,tailored_date=CASE WHEN ?1='في المغسلة' AND tailored_date IS NULL THEN date('now','localtime') ELSE tailored_date END,delivered_at=CASE WHEN ?1='تم التسليم' THEN datetime('now','localtime') ELSE NULL END WHERE id=?2",params![&status,order_id]).map_err(|e|e.to_string())?;}
+ for order_id in order_ids.iter(){update_order_stage(&transaction,*order_id,&status)?;}
  transaction.commit().map_err(|e|e.to_string())
 }
 
@@ -811,9 +817,9 @@ fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,
  let contains_pattern=format!("%{}%",escaped);
  let prefix_pattern=format!("{}%",escaped);
  let word_prefix_pattern=format!("% {}%",escaped);
- let mut statement=conn.prepare(
+ let mut statement=conn.prepare(&format!(
   "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),''),
-          COALESCE(SUM(MAX(0,CAST(NULLIF(i.total_price,'') AS REAL)-CAST(NULLIF(i.paid_amount,'') AS REAL)-CAST(NULLIF(i.discount,'') AS REAL))),0)
+          COALESCE(SUM({INVOICE_REMAINING_EXPRESSION}),0)
    FROM customers c
    LEFT JOIN invoices i ON i.customer_id=c.id
    WHERE ?1=''
@@ -830,7 +836,7 @@ fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,
    END,
    length(c.name) ASC,CAST(c.customer_code AS INTEGER) DESC,c.id DESC
    LIMIT 200"
- ).map_err(|e|e.to_string())?;
+ )).map_err(|e|e.to_string())?;
  let rows=statement.query_map(params![&query,&contains_pattern,&prefix_pattern,&word_prefix_pattern],|row|Ok(CustomerSearchItem{
   id:row.get(0)?,code:row.get(1)?,name:row.get(2)?,phone:row.get(3)?,
   invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,outstanding:row.get(6)?,
@@ -1200,6 +1206,12 @@ fn save_whatsapp_campaign(app:AppHandle,title:String,message:String,recipient_co
 
 fn parse_money(value:&str)->f64{value.trim().parse::<f64>().unwrap_or(0.0)}
 
+const INVOICE_REMAINING_EXPRESSION:&str="MAX(0,COALESCE(CAST(NULLIF(i.total_price,'') AS REAL),0)-COALESCE(CAST(NULLIF(i.paid_amount,'') AS REAL),0)-COALESCE(CAST(NULLIF(i.discount,'') AS REAL),0))";
+
+fn total_customer_debt(conn:&Connection)->Result<f64,String>{
+ conn.query_row(&format!("SELECT COALESCE(SUM({INVOICE_REMAINING_EXPRESSION}),0) FROM invoices i"),[],|row|row.get(0)).map_err(|e|e.to_string())
+}
+
 #[tauri::command]
 fn financial_overview(app:AppHandle)->Result<FinancialOverview,String>{
  let conn=db(&app)?;
@@ -1215,7 +1227,7 @@ fn financial_overview(app:AppHandle)->Result<FinancialOverview,String>{
  let month_manual_income:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دخل يدوي' AND date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
  let month_extra_income=month_registered_extra+month_manual_income;
  let month_expenses=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type IN ('مصروف','دفعة مورد') AND date(created_at)>=date('now','localtime','start of month') AND date(created_at)<date('now','localtime','start of month','+1 month')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
- let total_outstanding=conn.query_row("SELECT COALESCE(SUM(MAX(0,CAST(NULLIF(total_price,'') AS REAL)-CAST(NULLIF(paid_amount,'') AS REAL)-CAST(NULLIF(discount,'') AS REAL))),0) FROM invoices",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+ let total_outstanding=total_customer_debt(&conn)?;
  let entries={
   let mut statement=conn.prepare("SELECT id,entry_type,description,amount,payment_method,created_at FROM financial_entries ORDER BY id DESC LIMIT 100").map_err(|e|e.to_string())?;
   let rows=statement.query_map([],|row|Ok(FinancialEntry{id:row.get(0)?,entry_type:row.get(1)?,description:row.get(2)?,amount:row.get(3)?,payment_method:row.get(4)?,created_at:row.get(5)?})).map_err(|e|e.to_string())?;
@@ -1262,16 +1274,26 @@ fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method
 }
 
 #[tauri::command]
-fn daily_report(app:AppHandle,report_date:String,period:String)->Result<DailyReport,String>{
- let conn=db(&app)?;let day=report_date.trim();
- if day.is_empty(){return Err("اختر تاريخ التقرير".into())}
- if day.len()<10{return Err("تاريخ التقرير غير صحيح".into())}
- let (start,end,period_label)=match period.as_str(){
-  "شهري"=>(format!("{}-01",&day[..7]),"month".to_string(),"تقرير مالي شهري".to_string()),
-  "سنوي"=>(format!("{}-01-01",&day[..4]),"year".to_string(),"تقرير مالي سنوي".to_string()),
-  _=>(day.to_string(),"day".to_string(),"تقرير مالي يومي".to_string()),
- };
- let end_date=match end.as_str(){"month"=>conn.query_row("SELECT date(?1,'+1 month')",[&start],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?,"year"=>conn.query_row("SELECT date(?1,'+1 year')",[&start],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?,_=>conn.query_row("SELECT date(?1,'+1 day')",[&start],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?};
+fn daily_report(app:AppHandle,report_date:String,end_date:String,period:String)->Result<DailyReport,String>{
+ let conn=db(&app)?;
+ report_from_connection(&conn,&report_date,&end_date,&period)
+}
+
+fn report_from_connection(conn:&Connection,report_date:&str,end_date:&str,period:&str)->Result<DailyReport,String>{
+ let day=report_date.trim();let final_day=end_date.trim();
+ if day.is_empty()||final_day.is_empty(){return Err("اختر تاريخ من وإلى".into())}
+ for value in [day,final_day]{
+  if value.len()!=10||value.as_bytes()[4]!=b'-'||value.as_bytes()[7]!=b'-'||!value.bytes().enumerate().all(|(index,byte)|index==4||index==7||byte.is_ascii_digit()){
+   return Err("تاريخ التقرير غير صحيح".into())
+  }
+  let normalized:Option<String>=conn.query_row("SELECT date(?1,'+0 days')",[value],|row|row.get(0)).map_err(|e|e.to_string())?;
+  if normalized.as_deref()!=Some(value){return Err("تاريخ التقرير غير صحيح".into())}
+ }
+ if final_day<day{return Err("تاريخ إلى يجب أن يكون بعد تاريخ من أو مساويًا له".into())}
+ let period_label=match period{"يومي"=>"تقرير مالي يومي","شهري"=>"تقرير مالي شهري","سنوي"=>"تقرير مالي سنوي","مخصص"=>"تقرير مالي لفترة مخصصة",_=>return Err("فترة التقرير غير صحيحة".into())};
+ let start=day.to_string();
+ let upper_date=conn.query_row("SELECT date(?1,'+1 day')",[final_day],|row|row.get::<_,String>(0)).map_err(|e|e.to_string())?;
+ let end_date=upper_date;
  let new_customers=conn.query_row("SELECT COUNT(*) FROM customers WHERE date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
  let (invoices,thobes,invoice_sales):(i64,i64,f64)=conn.query_row("SELECT COUNT(*),COALESCE(SUM(total_thobes),0),COALESCE(SUM(CAST(NULLIF(total_price,'') AS REAL)),0) FROM invoices WHERE date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(|e|e.to_string())?;
  let invoice_received:f64=conn.query_row("SELECT COALESCE(SUM(amount),0) FROM financial_entries WHERE entry_type='دفعة فاتورة' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
@@ -1282,7 +1304,7 @@ fn daily_report(app:AppHandle,report_date:String,period:String)->Result<DailyRep
  let delivered=conn.query_row("SELECT COALESCE(SUM(quantity),0) FROM orders WHERE work_status='تم التسليم' AND date(delivered_at)>=date(?1) AND date(delivered_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
  let fabric_used=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='تفصيل ثوب' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
  let fabric_sold=conn.query_row("SELECT COALESCE(ABS(SUM(meters)),0) FROM fabric_movements WHERE movement_type='بيع قماش' AND date(created_at)>=date(?1) AND date(created_at)<date(?2)",params![&start,&end_date],|row|row.get(0)).map_err(|e|e.to_string())?;
- Ok(DailyReport{report_date:day.into(),period,period_label,new_customers,invoices,thobes,invoice_sales,invoice_received,extra_income,expenses,delivered,fabric_used,fabric_sold})
+ Ok(DailyReport{report_date:day.into(),end_date:final_day.into(),period:period.into(),period_label:period_label.into(),new_customers,invoices,thobes,invoice_sales,invoice_received,extra_income,expenses,delivered,fabric_used,fabric_sold})
 }
 
 #[tauri::command]
@@ -1801,6 +1823,51 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  let created_at:String=transaction.query_row("SELECT created_at FROM invoices WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
  Ok(InvoiceRecord{id,invoice_number,created_at})
+}
+
+#[cfg(test)]
+mod accounting_dashboard_report_tests{
+ use super::*;
+
+ #[test]
+ fn blank_paid_and_discount_still_count_as_debt(){
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE customers(id INTEGER PRIMARY KEY,customer_code TEXT,name TEXT,phone TEXT);CREATE TABLE invoices(id INTEGER PRIMARY KEY,customer_id INTEGER,created_at TEXT,total_price TEXT,paid_amount TEXT,discount TEXT);INSERT INTO customers VALUES(1,'1','عميل','0500000000');INSERT INTO invoices VALUES(1,1,'2026-09-19','300','','');INSERT INTO invoices VALUES(2,1,'2026-09-19','300','100','');INSERT INTO invoices VALUES(3,1,'2026-09-19','300','','20');INSERT INTO invoices VALUES(4,1,'2026-09-19','300','100','20');INSERT INTO invoices VALUES(5,1,'2026-09-19','','','');").unwrap();
+  assert_eq!(total_customer_debt(&conn).unwrap(),960.0);
+  let customer_debt:f64=conn.query_row(&format!("SELECT COALESCE(SUM({INVOICE_REMAINING_EXPRESSION}),0) FROM invoices i WHERE customer_id=1"),[],|row|row.get(0)).unwrap();
+  assert_eq!(customer_debt,960.0);
+ }
+
+ #[test]
+ fn dashboard_counts_each_event_and_direct_ready_transition(){
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE orders(id INTEGER PRIMARY KEY,received_date TEXT,tailored_date TEXT,quantity INTEGER,work_status TEXT,delivered_at TEXT);INSERT INTO orders VALUES(1,date('now','localtime'),NULL,2,'عند الخياط',NULL);INSERT INTO orders VALUES(2,date('now','localtime','-1 day'),NULL,3,'عند الخياط',NULL);INSERT INTO orders VALUES(3,date('now','localtime','-1 day'),date('now','localtime','-1 day'),1,'في المحل بانتظار التسليم',NULL);").unwrap();
+  let before=dashboard_from_connection(&conn).unwrap();
+  assert_eq!((before.received_today,before.tailored_today,before.ready_to_deliver),(2,0,1));
+  update_order_stage(&conn,1,"في المغسلة").unwrap();
+  update_order_stage(&conn,2,"في المحل بانتظار التسليم").unwrap();
+  let after=dashboard_from_connection(&conn).unwrap();
+  assert_eq!((after.received_today,after.tailored_today,after.ready_to_deliver),(2,5,4));
+  update_order_stage(&conn,2,"عند الخياط").unwrap();
+  let returned=dashboard_from_connection(&conn).unwrap();
+  assert_eq!((returned.tailored_today,returned.ready_to_deliver),(2,1));
+  update_order_stage(&conn,1,"في المحل بانتظار التسليم").unwrap();
+  update_order_stage(&conn,1,"تم التسليم").unwrap();
+  let delivered=dashboard_from_connection(&conn).unwrap();
+  assert_eq!((delivered.tailored_today,delivered.ready_to_deliver),(2,1));
+ }
+
+ #[test]
+ fn custom_report_range_includes_both_dates_and_excludes_neighbors(){
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE customers(created_at TEXT);CREATE TABLE invoices(created_at TEXT,total_thobes INTEGER,total_price TEXT);CREATE TABLE financial_entries(created_at TEXT,entry_type TEXT,amount REAL);CREATE TABLE extra_transactions(created_at TEXT,total_price REAL);CREATE TABLE orders(work_status TEXT,delivered_at TEXT,quantity INTEGER);CREATE TABLE fabric_movements(created_at TEXT,movement_type TEXT,meters REAL);INSERT INTO customers VALUES('2026-09-03 09:00:00'),('2026-09-20 00:00:00');INSERT INTO invoices VALUES('2026-09-03 10:00:00',2,'300'),('2026-09-19 23:59:59',1,'100'),('2026-09-20 00:00:00',1,'800');INSERT INTO financial_entries VALUES('2026-09-19 18:00:00','دفعة فاتورة',90),('2026-09-20 00:00:00','دفعة فاتورة',700);INSERT INTO extra_transactions VALUES('2026-09-19 18:00:00',15);INSERT INTO orders VALUES('تم التسليم','2026-09-19 22:00:00',2);").unwrap();
+  let report=report_from_connection(&conn,"2026-09-03","2026-09-19","مخصص").unwrap();
+  assert_eq!((report.new_customers,report.invoices,report.thobes,report.delivered),(1,2,3,2));
+  assert_eq!((report.invoice_sales,report.invoice_received,report.extra_income),(400.0,90.0,15.0));
+  assert_eq!(report.end_date,"2026-09-19");
+  assert!(report_from_connection(&conn,"2026-09-20","2026-09-03","مخصص").is_err());
+  assert!(report_from_connection(&conn,"2026-09-03","2026-09-31","مخصص").is_err());
+ }
 }
 
 fn main(){
