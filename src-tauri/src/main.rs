@@ -163,6 +163,21 @@ struct ReadyProduction{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
+struct ReadyItem{
+ id:i64,quantity:i64,initial_quantity:i64,length_inches:f64,width_inches:f64,
+ unit:String,measurements_json:String,designs_json:String,details_json:String,
+ thobe_type:String,fabric_id:Option<i64>,fabric_label:String,sale_price:f64,created_at:String
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+struct ReadyItemPayload{
+ quantity:i64,unit:String,measurements_json:String,designs_json:String,details_json:String,
+ thobe_type:String,fabric_id:Option<i64>,fabric_meters:f64,sale_price:f64
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 struct FabricMovement{
  id:i64,movement_type:String,meters:f64,balance_after:f64,entry_unit:String,carton_count:f64,
  meters_per_carton:f64,total_cost:f64,unit_cost:f64,notes:String,created_at:String
@@ -523,6 +538,14 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    size TEXT NOT NULL,
    fabric_id INTEGER NOT NULL,
    stock_quantity INTEGER NOT NULL DEFAULT 0,
+   initial_quantity INTEGER NOT NULL DEFAULT 0,
+   length_inches REAL NOT NULL DEFAULT 0,
+   width_inches REAL NOT NULL DEFAULT 0,
+   unit TEXT NOT NULL DEFAULT 'إنش',
+   measurements_json TEXT NOT NULL DEFAULT '{}',
+   designs_json TEXT NOT NULL DEFAULT '{}',
+   details_json TEXT NOT NULL DEFAULT '{}',
+   thobe_type TEXT NOT NULL DEFAULT 'سعودي',
    sale_price REAL NOT NULL DEFAULT 0,
    created_at TEXT NOT NULL,
    FOREIGN KEY(fabric_id) REFERENCES fabrics(id)
@@ -537,6 +560,18 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    FOREIGN KEY(product_id) REFERENCES ready_products(id)
   );
  ").map_err(|e|e.to_string())?;
+ for (column,declaration) in [
+  ("initial_quantity","INTEGER NOT NULL DEFAULT 0"),("length_inches","REAL NOT NULL DEFAULT 0"),
+  ("width_inches","REAL NOT NULL DEFAULT 0"),("unit","TEXT NOT NULL DEFAULT 'إنش'"),
+  ("measurements_json","TEXT NOT NULL DEFAULT '{}'"),("designs_json","TEXT NOT NULL DEFAULT '{}'"),
+  ("details_json","TEXT NOT NULL DEFAULT '{}'"),("thobe_type","TEXT NOT NULL DEFAULT 'سعودي'")
+ ]{
+  if !has_column(&conn,"ready_products",column)?{
+   conn.execute(&format!("ALTER TABLE ready_products ADD COLUMN {column} {declaration}"),[]).map_err(|e|e.to_string())?;
+  }
+ }
+ conn.execute("UPDATE ready_products SET initial_quantity=stock_quantity WHERE initial_quantity=0 AND measurements_json='{}'",[]).map_err(|e|e.to_string())?;
+ conn.execute("UPDATE ready_products SET length_inches=CAST(size AS REAL) WHERE length_inches=0 AND trim(size)<>''",[]).map_err(|e|e.to_string())?;
  migrate_fabric_classification(&conn)?;
  if !has_column(&conn,"extra_transactions","ready_product_id")?{conn.execute("ALTER TABLE extra_transactions ADD COLUMN ready_product_id INTEGER",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"orders","tailored_date")?{
@@ -849,6 +884,69 @@ fn delete_customer(app:AppHandle,customer_id:i64)->Result<(),String>{
  let deleted=conn.execute("DELETE FROM customers WHERE id=?1",[customer_id]).map_err(|e|e.to_string())?;
  if deleted==0{return Err("العميل غير موجود".into())}
  Ok(())
+}
+
+fn delete_invoice_from_connection(conn:&mut Connection,invoice_id:i64,customer_id:i64)->Result<(),String>{
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let (order_id,number):(i64,String)=transaction.query_row(
+  "SELECT order_id,invoice_number FROM invoices WHERE id=?1 AND customer_id=?2",
+  params![invoice_id,customer_id],|row|Ok((row.get(0)?,row.get(1)?))
+ ).map_err(|_|"الفاتورة غير موجودة لهذا العميل".to_string())?;
+ {
+  let mut statement=transaction.prepare("SELECT fabric_id,meters FROM invoice_fabric_usage WHERE invoice_id=?1").map_err(|e|e.to_string())?;
+  let usages=statement.query_map([invoice_id],|row|Ok((row.get::<_,i64>(0)?,row.get::<_,f64>(1)?))).map_err(|e|e.to_string())?
+   .collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+  for (fabric_id,meters) in usages{
+   transaction.execute("UPDATE fabrics SET stock_meters=stock_meters+?1 WHERE id=?2",params![meters,fabric_id]).map_err(|e|e.to_string())?;
+   let balance:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|e|e.to_string())?;
+   transaction.execute(
+    "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,reference_type,reference_id,notes,created_at)
+     VALUES(?1,'إلغاء فاتورة',?2,?3,'إلغاء فاتورة',?4,?5,datetime('now','localtime'))",
+    params![fabric_id,meters,balance,invoice_id,format!("استرجاع قماش الفاتورة {number}")]
+   ).map_err(|e|e.to_string())?;
+  }
+ }
+ for table in ["invoice_fabric_usage","worker_cut_entries","worker_tailor_entries","financial_entries"]{
+  transaction.execute(&format!("DELETE FROM {table} WHERE invoice_id=?1"),[invoice_id]).map_err(|e|e.to_string())?;
+ }
+ transaction.execute("DELETE FROM invoices WHERE id=?1",[invoice_id]).map_err(|e|e.to_string())?;
+ transaction.execute("DELETE FROM orders WHERE id=?1",[order_id]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn delete_invoice(app:AppHandle,invoice_id:i64,customer_id:i64)->Result<(),String>{
+ let mut conn=db(&app)?;
+ delete_invoice_from_connection(&mut conn,invoice_id,customer_id)
+}
+
+#[cfg(test)]
+mod invoice_deletion_tests{
+ use super::*;
+ #[test]
+ fn deleting_one_invoice_restores_its_fabric_and_removes_linked_money(){
+  let mut conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch(
+   "CREATE TABLE invoices(id INTEGER PRIMARY KEY,order_id INTEGER,customer_id INTEGER,invoice_number TEXT);
+    CREATE TABLE orders(id INTEGER PRIMARY KEY);
+    CREATE TABLE fabrics(id INTEGER PRIMARY KEY,stock_meters REAL);
+    CREATE TABLE invoice_fabric_usage(invoice_id INTEGER,fabric_id INTEGER,meters REAL);
+    CREATE TABLE fabric_movements(fabric_id INTEGER,movement_type TEXT,meters REAL,balance_after REAL,reference_type TEXT,reference_id INTEGER,notes TEXT,created_at TEXT);
+    CREATE TABLE worker_cut_entries(invoice_id INTEGER);
+    CREATE TABLE worker_tailor_entries(invoice_id INTEGER);
+    CREATE TABLE financial_entries(invoice_id INTEGER,amount REAL);
+    INSERT INTO invoices VALUES(1,1,1,'1'),(2,2,1,'2');
+    INSERT INTO orders VALUES(1),(2);
+    INSERT INTO fabrics VALUES(7,4);
+    INSERT INTO invoice_fabric_usage VALUES(1,7,2),(2,7,3);
+    INSERT INTO financial_entries VALUES(1,100),(2,60);"
+  ).unwrap();
+  assert!(delete_invoice_from_connection(&mut conn,1,2).is_err());
+  delete_invoice_from_connection(&mut conn,1,1).unwrap();
+  assert_eq!(conn.query_row("SELECT stock_meters FROM fabrics WHERE id=7",[],|row|row.get::<_,f64>(0)).unwrap(),6.0);
+  assert_eq!(conn.query_row("SELECT COUNT(*) FROM invoices WHERE id=2",[],|row|row.get::<_,i64>(0)).unwrap(),1);
+  assert_eq!(conn.query_row("SELECT SUM(amount) FROM financial_entries",[],|row|row.get::<_,f64>(0)).unwrap(),60.0);
+ }
 }
 
 #[tauri::command]
@@ -1638,6 +1736,149 @@ fn list_ready_products(app:AppHandle)->Result<Vec<ReadyProduct>,String>{
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
+fn ready_length(measurements:&serde_json::Value,key:&str,unit:&str)->Result<f64,String>{
+ let value=measurements.get(key).and_then(serde_json::Value::as_str).unwrap_or("").trim();
+ let number=value.replace(',',".").parse::<f64>().map_err(|_|format!("أدخل {key} بالأرقام"))?;
+ if !number.is_finite()||number<=0.0{return Err(format!("{key} غير صحيح"))}
+ Ok(if unit=="سم"{number/2.54}else{number})
+}
+
+#[tauri::command]
+fn list_ready_items(app:AppHandle)->Result<Vec<ReadyItem>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare(
+  "SELECT p.id,p.stock_quantity,p.initial_quantity,p.length_inches,p.width_inches,p.unit,
+          p.measurements_json,p.designs_json,p.details_json,p.thobe_type,p.fabric_id,
+          CASE WHEN f.kind='ملون' THEN 'كتالوج '||f.catalog_number||' — لون '||f.color_number ELSE f.name||' — '||f.color END,
+          p.sale_price,p.created_at
+   FROM ready_products p JOIN fabrics f ON f.id=p.fabric_id WHERE p.stock_quantity>0
+   ORDER BY p.length_inches,p.width_inches,p.id DESC"
+ ).map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(ReadyItem{
+  id:row.get(0)?,quantity:row.get(1)?,initial_quantity:row.get(2)?,
+  length_inches:row.get(3)?,width_inches:row.get(4)?,unit:row.get(5)?,
+  measurements_json:row.get(6)?,designs_json:row.get(7)?,details_json:row.get(8)?,
+  thobe_type:row.get(9)?,fabric_id:row.get(10)?,fabric_label:row.get(11)?,
+  sale_price:row.get(12)?,created_at:row.get(13)?
+ })).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+fn insert_ready_item(conn:&mut Connection,payload:ReadyItemPayload)->Result<i64,String>{
+ if payload.quantity<1||payload.quantity>1000{return Err("عدد الثياب الجاهزة غير صحيح".into())}
+ if payload.unit!="إنش"&&payload.unit!="سم"{return Err("وحدة المقاسات غير صحيحة".into())}
+ if !payload.sale_price.is_finite()||payload.sale_price<0.0{return Err("سعر البيع غير صحيح".into())}
+ if !payload.fabric_meters.is_finite()||payload.fabric_meters<=0.0{return Err("أدخل استهلاك القماش بالمتر للثوب الواحد".into())}
+ let fabric_id=payload.fabric_id.ok_or_else(||"اختر القماش للتفصيل الجاهز".to_string())?;
+ let measurements:serde_json::Value=serde_json::from_str(&payload.measurements_json).map_err(|_|"المقاسات غير صالحة".to_string())?;
+ let length=ready_length(&measurements,"طول أمام",&payload.unit)?;
+ let width=ready_length(&measurements,"مقاس العرض",&payload.unit)?;
+ let designs:serde_json::Value=serde_json::from_str(&payload.designs_json).map_err(|_|"الأشكال غير صالحة".to_string())?;
+ let details:serde_json::Value=serde_json::from_str(&payload.details_json).map_err(|_|"تفاصيل الجاهز غير صالحة".to_string())?;
+ if !measurements.is_object()||!designs.is_object()||!details.is_object(){return Err("بيانات الثوب غير مكتملة".into())}
+ let used=payload.quantity as f64*payload.fabric_meters;
+ if !used.is_finite(){return Err("استهلاك القماش غير صحيح".into())}
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let balance=consume_ready_fabric(&transaction,fabric_id,used)?;
+ transaction.execute(
+  "INSERT INTO ready_products(name,size,fabric_id,stock_quantity,initial_quantity,length_inches,width_inches,unit,measurements_json,designs_json,details_json,thobe_type,sale_price,created_at)
+   VALUES('جاهز',?1,?2,?3,?3,?4,?5,?6,?7,?8,?9,?10,?11,datetime('now','localtime'))",
+  params![format!("{length:.2}"),fabric_id,payload.quantity,length,width,payload.unit,payload.measurements_json,payload.designs_json,payload.details_json,payload.thobe_type.trim(),payload.sale_price]
+ ).map_err(|e|e.to_string())?;
+ let product_id=transaction.last_insert_rowid();
+ transaction.execute(
+  "INSERT INTO ready_productions(product_id,quantity,fabric_meters,tailor_name,created_at)
+   VALUES(?1,?2,?3,'',datetime('now','localtime'))",
+  params![product_id,payload.quantity,used]
+ ).map_err(|e|e.to_string())?;
+ let production_id=transaction.last_insert_rowid();
+ transaction.execute(
+  "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,reference_type,reference_id,notes,created_at)
+   VALUES(?1,'تفصيل جاهز',?2,?3,'تفصيل جاهز',?4,?5,datetime('now','localtime'))",
+  params![fabric_id,-used,balance,production_id,format!("{} ثوب جاهز",payload.quantity)]
+ ).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())?;
+ Ok(product_id)
+}
+
+#[tauri::command]
+fn add_ready_item(app:AppHandle,payload:ReadyItemPayload)->Result<i64,String>{
+ let mut conn=db(&app)?;
+ insert_ready_item(&mut conn,payload)
+}
+
+#[tauri::command]
+fn delete_ready_item(app:AppHandle,id:i64)->Result<(),String>{
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let sales:i64=transaction.query_row("SELECT COUNT(*) FROM extra_transactions WHERE ready_product_id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
+ if sales>0{return Err("لا يمكن حذف جاهز بيعت منه قطع؛ سجل البيع محفوظ".into())}
+ let (fabric_id,quantity,initial,measurements):(i64,i64,i64,String)=transaction.query_row(
+  "SELECT fabric_id,stock_quantity,initial_quantity,measurements_json FROM ready_products WHERE id=?1",
+  [id],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))
+ ).map_err(|_|"الجاهز غير موجود".to_string())?;
+ if measurements=="{}"||quantity!=initial{return Err("حذف هذا الجاهز القديم غير متاح؛ احتفظ بسجل التوريد والبيع".into())}
+ let total:f64=transaction.query_row("SELECT SUM(fabric_meters) FROM ready_productions WHERE product_id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
+ transaction.execute("UPDATE fabrics SET stock_meters=stock_meters+?1 WHERE id=?2",params![total,fabric_id]).map_err(|e|e.to_string())?;
+ let balance:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|e|e.to_string())?;
+ transaction.execute(
+  "INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,reference_type,reference_id,notes,created_at)
+   VALUES(?1,'إلغاء جاهز',?2,?3,'إلغاء جاهز',?4,'استرجاع قماش الجاهز',datetime('now','localtime'))",
+  params![fabric_id,total,balance,id]
+ ).map_err(|e|e.to_string())?;
+ transaction.execute("DELETE FROM ready_productions WHERE product_id=?1",[id]).map_err(|e|e.to_string())?;
+ transaction.execute("DELETE FROM ready_products WHERE id=?1",[id]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())
+}
+
+#[cfg(test)]
+mod ready_measurement_tests{
+ use super::*;
+ #[test]
+ fn measured_ready_stock_deducts_fabric_and_can_be_sold_without_customer(){
+  let mut conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch(
+   "CREATE TABLE fabrics(id INTEGER PRIMARY KEY,stock_meters REAL);
+    CREATE TABLE ready_products(id INTEGER PRIMARY KEY,name TEXT,size TEXT,fabric_id INTEGER,stock_quantity INTEGER,initial_quantity INTEGER,length_inches REAL,width_inches REAL,unit TEXT,measurements_json TEXT,designs_json TEXT,details_json TEXT,thobe_type TEXT,sale_price REAL,created_at TEXT);
+    CREATE TABLE ready_productions(id INTEGER PRIMARY KEY,product_id INTEGER,quantity INTEGER,fabric_meters REAL,tailor_name TEXT,created_at TEXT);
+    CREATE TABLE fabric_movements(fabric_id INTEGER,movement_type TEXT,meters REAL,balance_after REAL,reference_type TEXT,reference_id INTEGER,notes TEXT,created_at TEXT);
+    INSERT INTO fabrics VALUES(1,20);"
+  ).unwrap();
+  let id=insert_ready_item(&mut conn,ReadyItemPayload{
+   quantity:3,unit:"سم".into(),measurements_json:r#"{"طول أمام":"147.32","مقاس العرض":"50.8"}"#.into(),
+   designs_json:"{}".into(),details_json:"{}".into(),thobe_type:"سعودي".into(),
+   fabric_id:Some(1),fabric_meters:2.0,sale_price:90.0
+  }).unwrap();
+  let (length,width):(f64,f64)=conn.query_row("SELECT length_inches,width_inches FROM ready_products WHERE id=?1",[id],|row|Ok((row.get(0)?,row.get(1)?))).unwrap();
+  assert!((length-58.0).abs()<1e-9&&width==20.0);
+  assert!(length>=57.0&&length<=59.0);
+  assert_eq!(conn.query_row("SELECT stock_meters FROM fabrics WHERE id=1",[],|row|row.get::<_,f64>(0)).unwrap(),14.0);
+  let transaction=conn.transaction().unwrap();
+  assert!(reserve_ready_product(&transaction,id,4).is_err());
+  reserve_ready_product(&transaction,id,2).unwrap();
+  transaction.commit().unwrap();
+  assert_eq!(conn.query_row("SELECT stock_quantity FROM ready_products WHERE id=?1",[id],|row|row.get::<_,i64>(0)).unwrap(),1);
+ }
+ #[test]
+ fn insufficient_fabric_rolls_back_new_ready_product(){
+  let mut conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch(
+   "CREATE TABLE fabrics(id INTEGER PRIMARY KEY,stock_meters REAL);
+    CREATE TABLE ready_products(id INTEGER PRIMARY KEY,name TEXT,size TEXT,fabric_id INTEGER,stock_quantity INTEGER,initial_quantity INTEGER,length_inches REAL,width_inches REAL,unit TEXT,measurements_json TEXT,designs_json TEXT,details_json TEXT,thobe_type TEXT,sale_price REAL,created_at TEXT);
+    CREATE TABLE ready_productions(id INTEGER PRIMARY KEY,product_id INTEGER,quantity INTEGER,fabric_meters REAL,tailor_name TEXT,created_at TEXT);
+    CREATE TABLE fabric_movements(fabric_id INTEGER,movement_type TEXT,meters REAL,balance_after REAL,reference_type TEXT,reference_id INTEGER,notes TEXT,created_at TEXT);
+    INSERT INTO fabrics VALUES(1,3);"
+  ).unwrap();
+  let result=insert_ready_item(&mut conn,ReadyItemPayload{
+   quantity:2,unit:"إنش".into(),measurements_json:r#"{"طول أمام":"58","مقاس العرض":"20"}"#.into(),
+   designs_json:"{}".into(),details_json:"{}".into(),thobe_type:"سعودي".into(),
+   fabric_id:Some(1),fabric_meters:2.0,sale_price:90.0
+  });
+  assert!(result.is_err());
+  assert_eq!(conn.query_row("SELECT COUNT(*) FROM ready_products",[],|row|row.get::<_,i64>(0)).unwrap(),0);
+ }
+}
+
 #[tauri::command]
 fn list_ready_productions(app:AppHandle)->Result<Vec<ReadyProduction>,String>{
  let conn=db(&app)?;
@@ -2015,7 +2256,7 @@ mod accounting_dashboard_report_tests{
 }
 
 fn main(){
- let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{
