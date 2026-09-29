@@ -1618,7 +1618,7 @@ fn apply_invoice_fabric_usage(transaction:&rusqlite::Transaction<'_>,invoice_id:
    "SELECT stock_meters,name,color FROM fabrics WHERE id=?1",[fabric_id],
    |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
   ).map_err(|_|"أحد الأقمشة المختارة لم يعد موجودًا".to_string())?;
-  if required>stock+0.0001{return Err(format!("قماش {} — {}: المطلوب {:.2} متر والمتوفر {:.2} متر فقط",name,color,required,stock))}
+  if required>stock+0.0001&&!confirm_low_stock{return Err(format!("قماش {} — {}: المطلوب {:.2} متر والمتوفر {:.2} متر فقط. أكّد علمك بالنقص قبل المتابعة",name,color,required,stock))}
   let remaining=stock-required;
   if remaining<2.5&&!confirm_low_stock{
    return Err(format!("سيبقى من قماش {} — {} مقدار {:.2} متر فقط. فعّل تأكيد المخزون المنخفض ثم احفظ",name,color,remaining.max(0.0)))
@@ -1639,6 +1639,23 @@ fn apply_invoice_fabric_usage(transaction:&rusqlite::Transaction<'_>,invoice_id:
   ).map_err(|e|e.to_string())?;
  }
  Ok(())
+}
+
+#[cfg(test)]
+mod fabric_shortage_tests{
+ use super::*;
+ #[test]
+ fn only_explicit_confirmation_allows_full_deduction_past_zero(){
+  let mut conn=rusqlite::Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE fabrics(id INTEGER PRIMARY KEY,name TEXT,color TEXT,stock_meters REAL);CREATE TABLE invoice_fabric_usage(invoice_id INTEGER,fabric_id INTEGER,thobe_index INTEGER,meters REAL);CREATE TABLE fabric_movements(fabric_id INTEGER,movement_type TEXT,meters REAL,balance_after REAL,reference_type TEXT,reference_id INTEGER,notes TEXT,created_at TEXT);INSERT INTO fabrics(id,name,color,stock_meters) VALUES(1,'قطن','أبيض',1.0);").unwrap();
+  let transaction=conn.transaction().unwrap();
+  let usage=[FabricUsagePayload{fabric_id:1,thobe_index:0,meters:2.0}];
+  assert!(apply_invoice_fabric_usage(&transaction,7,&usage,false).is_err());
+  assert_eq!(transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=1",[],|row|row.get::<_,f64>(0)).unwrap(),1.0);
+  apply_invoice_fabric_usage(&transaction,7,&usage,true).unwrap();
+  assert_eq!(transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=1",[],|row|row.get::<_,f64>(0)).unwrap(),-1.0);
+  assert_eq!(transaction.query_row("SELECT meters FROM invoice_fabric_usage WHERE invoice_id=7",[],|row|row.get::<_,f64>(0)).unwrap(),2.0);
+ }
 }
 
 fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i64,cuts:&[WorkerCutPayload])->Result<(),String>{
@@ -1714,6 +1731,9 @@ fn validate_invoice_fabrics(details_json:&str,total_thobes:i64)->Result<(),Strin
   if !((fabric_id>0&&!name.is_empty())||(fabric_id==0&&name=="قماش العميل")){
    return Err(format!("اختر القماش للثوب {} قبل حفظ الفاتورة",index+1));
   }
+  if thobe.get("tailorName").and_then(serde_json::Value::as_str).unwrap_or("").trim().is_empty(){
+   return Err(format!("اختر الخياط للثوب {} قبل حفظ الفاتورة",index+1));
+  }
  }
  Ok(())
 }
@@ -1723,10 +1743,12 @@ mod invoice_fabric_tests{
  use super::validate_invoice_fabrics;
  #[test]
  fn every_thobe_requires_explicit_fabric(){
-  let complete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"}},{"fabricItemId":null,"fabric":{"اسم القماش":"قماش العميل"}}]}"#;
-  let incomplete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"}},{"fabricItemId":null,"fabric":{"اسم القماش":""}}]}"#;
+  let complete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"},"tailorName":"محمد"},{"fabricItemId":null,"fabric":{"اسم القماش":"قماش العميل"},"tailorName":"علي"}]}"#;
+  let incomplete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"},"tailorName":"محمد"},{"fabricItemId":null,"fabric":{"اسم القماش":""},"tailorName":"علي"}]}"#;
+  let no_tailor=r#"{"thobes":[{"fabricItemId":null,"fabric":{"اسم القماش":"قماش العميل"},"tailorName":""}]}"#;
   assert!(validate_invoice_fabrics(complete,2).is_ok());
   assert!(validate_invoice_fabrics(incomplete,2).unwrap_err().contains("للثوب 2"));
+  assert!(validate_invoice_fabrics(no_tailor,1).unwrap_err().contains("الخياط"));
   assert!(validate_invoice_fabrics(complete,3).is_err());
  }
 }

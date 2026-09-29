@@ -4979,3 +4979,11 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .missing-fabric-dialog p{margin:0 0 24px;font-size:clamp(1.15rem,2.4vw,1.4rem);font-weight:700;line-height:1.85}
 .missing-fabric-dialog button{min-height:52px;padding:8px 28px;border:0;border-radius:12px;background:#25372e;color:#fff;font-size:1.15rem;font-weight:800;cursor:pointer}
 .missing-fabric-dialog button:focus-visible{outline:3px solid #b4232d;outline-offset:3px}
+.shortage-dialog{width:min(620px,100%);max-height:90vh;overflow:auto}
+.shortage-dialog .shortage-items{display:grid;gap:8px;margin:0 0 16px;text-align:right}
+.shortage-items>div{display:grid;gap:3px;padding:10px 13px;border:1px solid #cd6267;border-radius:10px;background:#fff1f1;font-size:1rem}
+.shortage-items strong{color:#7c151c}.shortage-items small{font-size:.92rem;font-weight:700}
+.shortage-dialog .shortage-acknowledgement{display:flex;align-items:center;gap:10px;margin:8px 0 20px;padding:12px;border:2px solid #9b1b23;border-radius:10px;text-align:right;font-size:1.02rem;font-weight:800;cursor:pointer}
+.shortage-acknowledgement input{width:23px;height:23px;flex:none;accent-color:#9b1b23}
+.shortage-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.shortage-actions button:disabled{opacity:.5;cursor:not-allowed}.shortage-dialog .shortage-cancel{background:#e6e6e6;color:#222}

@@ -1,4 +1,5 @@
 export type FabricLengthUnit = "متر" | "ياردة";
+export const DEFAULT_ORDER_FABRIC_UNIT: FabricLengthUnit = "ياردة";
 
 export const METERS_PER_YARD = 0.9144;
 
