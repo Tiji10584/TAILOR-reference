@@ -145,7 +145,20 @@ struct SupplierLedgerEntry{
 #[serde(rename_all="camelCase")]
 struct FabricItem{
  id:i64,supplier_id:Option<i64>,supplier_name:String,name:String,color:String,
- stock_meters:f64,purchase_price:f64,sale_price:f64,created_at:String
+ stock_meters:f64,purchase_price:f64,sale_price:f64,created_at:String,
+ kind:String,catalog_number:String,color_number:String
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct ReadyProduct{
+ id:i64,name:String,size:String,fabric_id:i64,fabric_label:String,stock_quantity:i64,sale_price:f64,created_at:String
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct ReadyProduction{
+ id:i64,product_id:i64,product_name:String,size:String,quantity:i64,fabric_meters:f64,tailor_name:String,created_at:String
 }
 
 #[derive(Serialize)]
@@ -251,7 +264,8 @@ struct SavedInvoice{
 #[serde(rename_all="camelCase")]
 struct ExtraTransactionPayload{
  transaction_type:String,customer_name:String,customer_phone:String,fabric_id:Option<i64>,
- quantity:i64,meters:f64,description:String,total_price:f64,payment_method:String,worker_name:String
+ quantity:i64,meters:f64,description:String,total_price:f64,payment_method:String,worker_name:String,
+ ready_product_id:Option<i64>
 }
 
 #[derive(Serialize)]
@@ -259,7 +273,7 @@ struct ExtraTransactionPayload{
 struct ExtraTransaction{
  id:i64,transaction_type:String,customer_name:String,customer_phone:String,fabric_id:Option<i64>,
  fabric_name:String,fabric_color:String,quantity:i64,meters:f64,description:String,total_price:f64,
- payment_method:String,worker_name:String,created_at:String
+ payment_method:String,worker_name:String,created_at:String,ready_product_name:String
 }
 
 #[derive(Serialize)]
@@ -305,6 +319,13 @@ fn has_column(conn:&Connection,table:&str,column:&str)->Result<bool,String>{
   if row.map_err(|e|e.to_string())?==column{return Ok(true)}
  }
  Ok(false)
+}
+
+fn migrate_fabric_classification(conn:&Connection)->Result<(),String>{
+ if !has_column(conn,"fabrics","kind")?{conn.execute("ALTER TABLE fabrics ADD COLUMN kind TEXT NOT NULL DEFAULT 'أبيض'",[]).map_err(|e|e.to_string())?;}
+ if !has_column(conn,"fabrics","catalog_number")?{conn.execute("ALTER TABLE fabrics ADD COLUMN catalog_number TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ if !has_column(conn,"fabrics","color_number")?{conn.execute("ALTER TABLE fabrics ADD COLUMN color_number TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ Ok(())
 }
 
 fn db(app:&AppHandle)->Result<Connection,String>{
@@ -496,7 +517,28 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    setting_key TEXT PRIMARY KEY,
    setting_value TEXT NOT NULL DEFAULT ''
   );
+  CREATE TABLE IF NOT EXISTS ready_products(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   name TEXT NOT NULL,
+   size TEXT NOT NULL,
+   fabric_id INTEGER NOT NULL,
+   stock_quantity INTEGER NOT NULL DEFAULT 0,
+   sale_price REAL NOT NULL DEFAULT 0,
+   created_at TEXT NOT NULL,
+   FOREIGN KEY(fabric_id) REFERENCES fabrics(id)
+  );
+  CREATE TABLE IF NOT EXISTS ready_productions(
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   product_id INTEGER NOT NULL,
+   quantity INTEGER NOT NULL,
+   fabric_meters REAL NOT NULL,
+   tailor_name TEXT NOT NULL DEFAULT '',
+   created_at TEXT NOT NULL,
+   FOREIGN KEY(product_id) REFERENCES ready_products(id)
+  );
  ").map_err(|e|e.to_string())?;
+ migrate_fabric_classification(&conn)?;
+ if !has_column(&conn,"extra_transactions","ready_product_id")?{conn.execute("ALTER TABLE extra_transactions ADD COLUMN ready_product_id INTEGER",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"orders","tailored_date")?{
   conn.execute("ALTER TABLE orders ADD COLUMN tailored_date TEXT",[]).map_err(|e|e.to_string())?;
  }
@@ -967,7 +1009,8 @@ fn list_supplier_ledger(app:AppHandle,supplier_id:i64)->Result<Vec<SupplierLedge
    FROM (
     SELECT 'supply' AS source_type,m.id AS source_id,f.supplier_id AS supplier_id,
            'توريد قماش' AS entry_type,
-           f.name || CASE WHEN trim(f.color)<>'' THEN ' — ' || f.color ELSE '' END AS title,
+           CASE WHEN f.kind='ملون' THEN 'كتالوج ' || f.catalog_number || ' — لون ' || f.color_number
+             ELSE f.name || CASE WHEN trim(f.color)<>'' THEN ' — ' || f.color ELSE '' END END AS title,
            m.movement_type || ' · ' || CASE m.entry_unit
              WHEN 'ياردة' THEN printf('%.2f ياردة',m.meters/0.9144)
              WHEN 'كرتون' THEN printf('%.2f كرتون × %.2f متر',m.carton_count,m.meters_per_carton)
@@ -1034,30 +1077,36 @@ fn list_fabrics(app:AppHandle)->Result<Vec<FabricItem>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
   "SELECT f.id,f.supplier_id,COALESCE(s.name,''),f.name,f.color,f.stock_meters,
-          f.purchase_price,f.sale_price,f.created_at
+          f.purchase_price,f.sale_price,f.created_at,f.kind,f.catalog_number,f.color_number
    FROM fabrics f LEFT JOIN suppliers s ON s.id=f.supplier_id
    ORDER BY f.name,f.color,f.id"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|Ok(FabricItem{
   id:row.get(0)?,supplier_id:row.get(1)?,supplier_name:row.get(2)?,name:row.get(3)?,color:row.get(4)?,
   stock_meters:row.get(5)?,purchase_price:row.get(6)?,sale_price:row.get(7)?,created_at:row.get(8)?,
+  kind:row.get(9)?,catalog_number:row.get(10)?,color_number:row.get(11)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
 #[tauri::command]
-fn add_fabric(app:AppHandle,supplier_id:Option<i64>,name:String,color:String,entry_unit:String,meter_quantity:f64,carton_count:f64,meters_per_carton:f64,purchase_amount:f64,sale_price:f64)->Result<i64,String>{
- let name=name.trim();let color=color.trim();
- if name.is_empty()||color.is_empty(){return Err("اسم القماش واللون مطلوبان".into())}
+fn add_fabric(app:AppHandle,supplier_id:Option<i64>,name:String,color:String,kind:String,catalog_number:String,color_number:String,entry_unit:String,meter_quantity:f64,carton_count:f64,meters_per_carton:f64,purchase_amount:f64,sale_price:f64)->Result<i64,String>{
+ let kind=kind.trim();
+ if kind!="أبيض"&&kind!="ملون"{return Err("اختر القماش الأبيض أو الملون".into())}
+ let catalog_number=catalog_number.trim();let color_number=color_number.trim();
+ let name=if kind=="ملون"{catalog_number}else{name.trim()};
+ let color=if kind=="ملون"{color_number}else{color.trim()};
+ if name.is_empty()||color.is_empty(){return Err(if kind=="ملون"{"رقم الكتالوج ورقم اللون مطلوبان"}else{"اسم القماش واللون مطلوبان"}.into())}
  let (stock_meters,purchase_price,total_cost,normalized_unit)=supply_calculation(&entry_unit,meter_quantity,carton_count,meters_per_carton,purchase_amount)?;
+ require_supplier_for_purchase(total_cost,supplier_id)?;
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
  let existing=transaction.query_row(
   "SELECT id,stock_meters,purchase_price FROM fabrics
-   WHERE lower(trim(name))=lower(?1) AND lower(trim(color))=lower(?2)
+   WHERE lower(trim(name))=lower(?1) AND lower(trim(color))=lower(?2) AND kind=?4
      AND ((supplier_id IS NULL AND ?3 IS NULL) OR supplier_id=?3)
    ORDER BY id LIMIT 1",
-  params![name,color,supplier_id],
+  params![name,color,supplier_id,kind],
   |row|Ok((row.get::<_,i64>(0)?,row.get::<_,f64>(1)?,row.get::<_,f64>(2)?))
  ).optional().map_err(|e|e.to_string())?;
  if let Some((id,current_stock,current_cost))=existing{
@@ -1076,9 +1125,9 @@ fn add_fabric(app:AppHandle,supplier_id:Option<i64>,name:String,color:String,ent
   return Ok(id)
  }
  transaction.execute(
-  "INSERT INTO fabrics(supplier_id,name,color,stock_meters,purchase_price,sale_price,created_at)
-   VALUES(?1,?2,?3,?4,?5,?6,datetime('now','localtime'))",
-  params![supplier_id,name,color,stock_meters,purchase_price,sale_price.max(0.0)]
+  "INSERT INTO fabrics(supplier_id,name,color,stock_meters,purchase_price,sale_price,created_at,kind,catalog_number,color_number)
+   VALUES(?1,?2,?3,?4,?5,?6,datetime('now','localtime'),?7,?8,?9)",
+  params![supplier_id,name,color,stock_meters,purchase_price,sale_price.max(0.0),kind,if kind=="ملون"{catalog_number}else{""},if kind=="ملون"{color_number}else{""}]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  if stock_meters>0.0{
@@ -1110,9 +1159,43 @@ fn supply_calculation(entry_unit:&str,meter_quantity:f64,carton_count:f64,meters
  Ok((meters,(meter_quantity*purchase_amount)/meters,meter_quantity*purchase_amount,normalized_unit.into()))
 }
 
+fn require_supplier_for_purchase(total_cost:f64,supplier_id:Option<i64>)->Result<(),String>{
+ if total_cost>0.0&&supplier_id.is_none(){Err("اختر المورد لتسجيل قيمة التوريد دينًا على المحل".into())}else{Ok(())}
+}
+
 #[cfg(test)]
 mod fabric_unit_tests{
- use super::supply_calculation;
+ use super::{supply_calculation,require_supplier_for_purchase,migrate_fabric_classification,consume_ready_fabric,reserve_ready_product};
+ use rusqlite::Connection;
+ #[test]
+ fn older_fabrics_remain_white_and_migration_is_repeatable(){
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE fabrics(id INTEGER PRIMARY KEY,name TEXT,color TEXT);INSERT INTO fabrics(name,color) VALUES('الأجواد','سكري');").unwrap();
+  migrate_fabric_classification(&conn).unwrap();migrate_fabric_classification(&conn).unwrap();
+  let fields:(String,String,String)=conn.query_row("SELECT kind,catalog_number,color_number FROM fabrics",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).unwrap();
+  assert_eq!(fields,("أبيض".into(),"".into(),"".into()));
+ }
+ #[test]
+ fn ready_production_and_sale_update_both_inventories_without_overselling(){
+  let mut conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE fabrics(id INTEGER PRIMARY KEY,stock_meters REAL);CREATE TABLE ready_products(id INTEGER PRIMARY KEY,stock_quantity INTEGER);INSERT INTO fabrics VALUES(1,12);INSERT INTO ready_products VALUES(1,3);").unwrap();
+  let tx=conn.transaction().unwrap();
+  assert_eq!(consume_ready_fabric(&tx,1,7.0).unwrap(),5.0);
+  assert!(consume_ready_fabric(&tx,1,6.0).is_err());
+  reserve_ready_product(&tx,1,2).unwrap();
+  assert!(reserve_ready_product(&tx,1,2).is_err());
+  tx.commit().unwrap();
+  let fabric:f64=conn.query_row("SELECT stock_meters FROM fabrics WHERE id=1",[],|r|r.get(0)).unwrap();
+  let ready:i64=conn.query_row("SELECT stock_quantity FROM ready_products WHERE id=1",[],|r|r.get(0)).unwrap();
+  assert_eq!((fabric,ready),(5.0,1));
+ }
+ #[test]
+ fn paid_hundred_meters_create_thousand_riyals_supplier_debt(){
+  let (meters,unit_cost,total_cost,unit)=supply_calculation("متر",100.0,0.0,0.0,10.0).unwrap();
+  assert_eq!((meters,unit_cost,total_cost,unit),(100.0,10.0,1000.0,"متر".into()));
+  assert!(require_supplier_for_purchase(total_cost,None).is_err());
+  assert!(require_supplier_for_purchase(total_cost,Some(1)).is_ok());
+ }
  #[test]
  fn yard_purchase_preserves_cost_and_converts_stock_to_meters(){
   let (meters,cost_per_meter,total,unit)=supply_calculation("ياردة",100.0,0.0,0.0,10.0).unwrap();
@@ -1132,7 +1215,8 @@ fn restock_fabric(app:AppHandle,fabric_id:i64,entry_unit:String,meter_quantity:f
  let (meters,purchase_price,total_cost,normalized_unit)=supply_calculation(&entry_unit,meter_quantity,carton_count,meters_per_carton,purchase_amount)?;
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
- let current:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|_|"القماش غير موجود".to_string())?;
+ let (current,supplier_id):(f64,Option<i64>)=transaction.query_row("SELECT stock_meters,supplier_id FROM fabrics WHERE id=?1",[fabric_id],|row|Ok((row.get(0)?,row.get(1)?))).map_err(|_|"القماش غير موجود".to_string())?;
+ require_supplier_for_purchase(total_cost,supplier_id)?;
  let balance=current+meters;
  transaction.execute("UPDATE fabrics SET stock_meters=?1,purchase_price=CASE WHEN ?2>0 THEN ?2 ELSE purchase_price END WHERE id=?3",params![balance,purchase_price,fabric_id]).map_err(|e|e.to_string())?;
  transaction.execute(
@@ -1547,17 +1631,72 @@ fn save_theme(app:AppHandle,theme:String)->Result<AppSettings,String>{
 }
 
 #[tauri::command]
+fn list_ready_products(app:AppHandle)->Result<Vec<ReadyProduct>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare("SELECT p.id,p.name,p.size,p.fabric_id,CASE WHEN f.kind='ملون' THEN 'كتالوج '||f.catalog_number||' — لون '||f.color_number ELSE f.name||' — '||f.color END,p.stock_quantity,p.sale_price,p.created_at FROM ready_products p JOIN fabrics f ON f.id=p.fabric_id ORDER BY p.id DESC").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(ReadyProduct{id:row.get(0)?,name:row.get(1)?,size:row.get(2)?,fabric_id:row.get(3)?,fabric_label:row.get(4)?,stock_quantity:row.get(5)?,sale_price:row.get(6)?,created_at:row.get(7)?})).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn list_ready_productions(app:AppHandle)->Result<Vec<ReadyProduction>,String>{
+ let conn=db(&app)?;
+ let mut statement=conn.prepare("SELECT b.id,b.product_id,p.name,p.size,b.quantity,b.fabric_meters,b.tailor_name,b.created_at FROM ready_productions b JOIN ready_products p ON p.id=b.product_id ORDER BY b.id DESC LIMIT 100").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(ReadyProduction{id:row.get(0)?,product_id:row.get(1)?,product_name:row.get(2)?,size:row.get(3)?,quantity:row.get(4)?,fabric_meters:row.get(5)?,tailor_name:row.get(6)?,created_at:row.get(7)?})).map_err(|e|e.to_string())?;
+ rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+fn consume_ready_fabric(transaction:&rusqlite::Transaction<'_>,fabric_id:i64,meters:f64)->Result<f64,String>{
+ let stock:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|_|"القماش غير موجود".to_string())?;
+ if stock+0.0001<meters{return Err(format!("المتوفر {:.2} متر فقط؛ التفصيل يحتاج {:.2} متر",stock,meters))}
+ let balance=stock-meters;
+ transaction.execute("UPDATE fabrics SET stock_meters=?1 WHERE id=?2",params![balance,fabric_id]).map_err(|e|e.to_string())?;
+ Ok(balance)
+}
+
+fn reserve_ready_product(transaction:&rusqlite::Transaction<'_>,product_id:i64,quantity:i64)->Result<(),String>{
+ let available:i64=transaction.query_row("SELECT stock_quantity FROM ready_products WHERE id=?1",[product_id],|row|row.get(0)).map_err(|_|"صنف الجاهز غير موجود".to_string())?;
+ if quantity<1||quantity>available{return Err(format!("المتوفر {} قطع فقط من هذا الجاهز",available))}
+ transaction.execute("UPDATE ready_products SET stock_quantity=stock_quantity-?1 WHERE id=?2",params![quantity,product_id]).map_err(|e|e.to_string())?;
+ Ok(())
+}
+
+#[tauri::command]
+fn add_ready_production(app:AppHandle,name:String,size:String,fabric_id:i64,quantity:i64,meters_per_piece:f64,tailor_name:String,sale_price:f64)->Result<i64,String>{
+ let name=name.trim();let size=size.trim();
+ if name.is_empty()||size.is_empty(){return Err("اسم الجاهز ومقاسه مطلوبان".into())}
+ if quantity<=0||quantity>1000||!meters_per_piece.is_finite()||meters_per_piece<=0.0||!sale_price.is_finite()||sale_price<0.0{return Err("الكمية أو الاستهلاك أو السعر غير صحيح".into())}
+ let total_meters=quantity as f64*meters_per_piece;
+ if !total_meters.is_finite(){return Err("استهلاك القماش غير صحيح".into())}
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let balance=consume_ready_fabric(&transaction,fabric_id,total_meters)?;
+ let existing=transaction.query_row("SELECT id,stock_quantity FROM ready_products WHERE lower(trim(name))=lower(?1) AND lower(trim(size))=lower(?2) AND fabric_id=?3 ORDER BY id LIMIT 1",params![name,size,fabric_id],|row|Ok((row.get::<_,i64>(0)?,row.get::<_,i64>(1)?))).optional().map_err(|e|e.to_string())?;
+ let product_id=if let Some((id,stock_quantity))=existing{
+  transaction.execute("UPDATE ready_products SET stock_quantity=?1,sale_price=?2 WHERE id=?3",params![stock_quantity+quantity,sale_price,id]).map_err(|e|e.to_string())?;id
+ }else{
+  transaction.execute("INSERT INTO ready_products(name,size,fabric_id,stock_quantity,sale_price,created_at) VALUES(?1,?2,?3,?4,?5,datetime('now','localtime'))",params![name,size,fabric_id,quantity,sale_price]).map_err(|e|e.to_string())?;
+  transaction.last_insert_rowid()
+ };
+ transaction.execute("INSERT INTO ready_productions(product_id,quantity,fabric_meters,tailor_name,created_at) VALUES(?1,?2,?3,?4,datetime('now','localtime'))",params![product_id,quantity,total_meters,tailor_name.trim()]).map_err(|e|e.to_string())?;
+ let batch_id=transaction.last_insert_rowid();
+ transaction.execute("INSERT INTO fabric_movements(fabric_id,movement_type,meters,balance_after,reference_type,reference_id,notes,created_at) VALUES(?1,'تفصيل جاهز',?2,?3,'تفصيل جاهز',?4,?5,datetime('now','localtime'))",params![fabric_id,-total_meters,balance,batch_id,format!("{} · {} · {} قطع",name,size,quantity)]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())?;Ok(batch_id)
+}
+
+#[tauri::command]
 fn list_extra_transactions(app:AppHandle)->Result<Vec<ExtraTransaction>,String>{
  let conn=db(&app)?;
  let mut statement=conn.prepare(
   "SELECT e.id,e.transaction_type,e.customer_name,e.customer_phone,e.fabric_id,
-          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.worker_name,e.created_at
-   FROM extra_transactions e LEFT JOIN fabrics f ON f.id=e.fabric_id ORDER BY e.id DESC LIMIT 100"
+          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.worker_name,e.created_at,
+          COALESCE(r.name||' · مقاس '||r.size,'')
+   FROM extra_transactions e LEFT JOIN fabrics f ON f.id=e.fabric_id LEFT JOIN ready_products r ON r.id=e.ready_product_id ORDER BY e.id DESC LIMIT 100"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|Ok(ExtraTransaction{
   id:row.get(0)?,transaction_type:row.get(1)?,customer_name:row.get(2)?,customer_phone:row.get(3)?,
   fabric_id:row.get(4)?,fabric_name:row.get(5)?,fabric_color:row.get(6)?,quantity:row.get(7)?,meters:row.get(8)?,
-  description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,worker_name:row.get(12)?,created_at:row.get(13)?,
+  description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,worker_name:row.get(12)?,created_at:row.get(13)?,ready_product_name:row.get(14)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
@@ -1577,10 +1716,14 @@ fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result
   let stock:f64=transaction.query_row("SELECT stock_meters FROM fabrics WHERE id=?1",[fabric_id],|row|row.get(0)).map_err(|_|"القماش غير موجود".to_string())?;
   if payload.meters>stock+0.0001{return Err(format!("المتوفر {:.2} متر فقط",stock))}
  }
+ if transaction_type=="بيع جاهز"{
+  let product_id=payload.ready_product_id.ok_or_else(||"اختر صنف الجاهز من المخزون".to_string())?;
+  reserve_ready_product(&transaction,product_id,payload.quantity)?;
+ }
  transaction.execute(
-  "INSERT INTO extra_transactions(transaction_type,customer_name,customer_phone,fabric_id,quantity,meters,description,total_price,payment_method,worker_name,created_at)
-   VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,datetime('now','localtime'))",
-  params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method,payload.worker_name.trim()]
+  "INSERT INTO extra_transactions(transaction_type,customer_name,customer_phone,fabric_id,quantity,meters,description,total_price,payment_method,worker_name,created_at,ready_product_id)
+   VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,datetime('now','localtime'),?11)",
+  params![transaction_type,payload.customer_name.trim(),payload.customer_phone.trim(),payload.fabric_id,payload.quantity.max(1),payload.meters.max(0.0),payload.description.trim(),payload.total_price,&payload.payment_method,payload.worker_name.trim(),if transaction_type=="بيع جاهز"{payload.ready_product_id}else{None}]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  if payload.total_price>0.0001{
@@ -1602,12 +1745,13 @@ fn save_extra_transaction(app:AppHandle,payload:ExtraTransactionPayload)->Result
  }
  let result=transaction.query_row(
   "SELECT e.id,e.transaction_type,e.customer_name,e.customer_phone,e.fabric_id,
-          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.worker_name,e.created_at
-   FROM extra_transactions e LEFT JOIN fabrics f ON f.id=e.fabric_id WHERE e.id=?1",
+          COALESCE(f.name,''),COALESCE(f.color,''),e.quantity,e.meters,e.description,e.total_price,e.payment_method,e.worker_name,e.created_at,
+          COALESCE(r.name||' · مقاس '||r.size,'')
+   FROM extra_transactions e LEFT JOIN fabrics f ON f.id=e.fabric_id LEFT JOIN ready_products r ON r.id=e.ready_product_id WHERE e.id=?1",
   [id],|row|Ok(ExtraTransaction{
    id:row.get(0)?,transaction_type:row.get(1)?,customer_name:row.get(2)?,customer_phone:row.get(3)?,
    fabric_id:row.get(4)?,fabric_name:row.get(5)?,fabric_color:row.get(6)?,quantity:row.get(7)?,meters:row.get(8)?,
-   description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,worker_name:row.get(12)?,created_at:row.get(13)?,
+   description:row.get(9)?,total_price:row.get(10)?,payment_method:row.get(11)?,worker_name:row.get(12)?,created_at:row.get(13)?,ready_product_name:row.get(14)?,
   })
  ).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
@@ -1871,7 +2015,7 @@ mod accounting_dashboard_report_tests{
 }
 
 fn main(){
- let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{

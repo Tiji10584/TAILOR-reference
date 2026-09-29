@@ -1,8 +1,10 @@
-# TAILOR 0.2.9: distribution and offline activation
+# TAILOR 0.3.0: distribution and offline activation
 
-Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.2.9_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
+Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.3.0_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
 
 Version 0.2.9 counts invoice debt when the paid amount or discount is empty. The dashboard refreshes when opened, on focus, and while visible; direct moves to a completed stage record the tailoring date. Financial reports accept inclusive custom **from** and **to** dates, with daily, monthly, and yearly shortcuts. The report preview and printed sheet show both dates.
+
+Version 0.3.0 separates white and colored fabric in stock and tailoring, records catalog and color numbers for colored cloth, and shows total supply value before saving. Priced supply requires a supplier so its purchase value enters the supplier debt ledger. Existing fabrics are retained as white by the migration. Ready production consumes cloth and creates ready stock; ready sales decrement that stock. Copy `tailor.sqlite` to a safe backup before the first launch of this version. Existing app identity and license verification key remain unchanged.
 
 New thobes start with yards as their input unit; previously saved thobes keep the unit used when saved. Inventory deduction remains in meters. When the required fabric exceeds available stock, the operator must explicitly acknowledge that the full deduction may result in a negative balance before saving or printing. Missing tailor selections are shown in a centered warning.
 
