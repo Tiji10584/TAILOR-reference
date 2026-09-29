@@ -1704,8 +1704,36 @@ fn apply_invoice_worker_cuts(transaction:&rusqlite::Transaction<'_>,invoice_id:i
  Ok(())
 }
 
+fn validate_invoice_fabrics(details_json:&str,total_thobes:i64)->Result<(),String>{
+ let details:serde_json::Value=serde_json::from_str(details_json).map_err(|_|"بيانات الثياب غير صالحة".to_string())?;
+ let thobes=details.get("thobes").and_then(serde_json::Value::as_array).ok_or_else(||"بيانات الثياب غير مكتملة".to_string())?;
+ if total_thobes<1||thobes.len()!=total_thobes as usize{return Err("عدد الثياب في الفاتورة غير صحيح".into())}
+ for (index,thobe) in thobes.iter().enumerate(){
+  let name=thobe.get("fabric").and_then(|fabric|fabric.get("اسم القماش")).and_then(serde_json::Value::as_str).unwrap_or("").trim();
+  let fabric_id=thobe.get("fabricItemId").and_then(serde_json::Value::as_i64).unwrap_or(0);
+  if !((fabric_id>0&&!name.is_empty())||(fabric_id==0&&name=="قماش العميل")){
+   return Err(format!("اختر القماش للثوب {} قبل حفظ الفاتورة",index+1));
+  }
+ }
+ Ok(())
+}
+
+#[cfg(test)]
+mod invoice_fabric_tests{
+ use super::validate_invoice_fabrics;
+ #[test]
+ fn every_thobe_requires_explicit_fabric(){
+  let complete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"}},{"fabricItemId":null,"fabric":{"اسم القماش":"قماش العميل"}}]}"#;
+  let incomplete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"}},{"fabricItemId":null,"fabric":{"اسم القماش":""}}]}"#;
+  assert!(validate_invoice_fabrics(complete,2).is_ok());
+  assert!(validate_invoice_fabrics(incomplete,2).unwrap_err().contains("الثوب 2"));
+  assert!(validate_invoice_fabrics(complete,3).is_err());
+ }
+}
+
 #[tauri::command]
 fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,String>{
+ validate_invoice_fabrics(&payload.details_json,payload.total_thobes)?;
  let mut conn=db(&app)?;
  if let Some(id)=payload.id{
   let transaction=conn.transaction().map_err(|e|e.to_string())?;

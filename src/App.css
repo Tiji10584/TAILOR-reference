@@ -4972,3 +4972,10 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .activation-card .activation-expiry-label{display:grid;gap:6px;font-size:.85rem;font-weight:700}
 .activation-card input[type=datetime-local]{height:48px;padding:0 10px;font:1rem Arial,sans-serif;letter-spacing:normal;text-align:center;direction:ltr}
 .activation-card .activation-security-note{font-size:.75rem;line-height:1.5}
+.missing-fabric-overlay{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.78)}
+.missing-fabric-dialog{width:min(520px,100%);padding:32px 28px;border:2px solid #c63434;border-radius:20px;background:#fff;color:#202020;text-align:center;box-shadow:0 24px 80px #0008}
+.missing-fabric-symbol{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 16px;border-radius:50%;background:#b4232d;color:#fff;font:800 2.4rem Arial,sans-serif}
+.missing-fabric-dialog h2{margin:0 0 14px;font-size:clamp(1.4rem,3vw,1.9rem);line-height:1.4;color:#8e1922}
+.missing-fabric-dialog p{margin:0 0 24px;font-size:clamp(1.15rem,2.4vw,1.4rem);font-weight:700;line-height:1.85}
+.missing-fabric-dialog button{min-height:52px;padding:8px 28px;border:0;border-radius:12px;background:#25372e;color:#fff;font-size:1.15rem;font-weight:800;cursor:pointer}
+.missing-fabric-dialog button:focus-visible{outline:3px solid #b4232d;outline-offset:3px}

@@ -73,10 +73,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName
-          gh release view v0.2.6 *> $null
+          gh release view v0.2.7 *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload v0.2.6 "$installer" --clobber
+            gh release upload v0.2.7 "$installer" --clobber
           } else {
-            gh release create v0.2.6 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.6' --notes 'Add owner-signed timed and permanent licenses, live expiration with activation lock screen, and a protected local activation history. Existing v1 licenses remain permanent. The Windows installer is verified by a silent installation before release.'
+            gh release create v0.2.7 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.7' --notes 'Require an explicit fabric choice for every thobe before an invoice can be saved or printed. A centered warning directs the operator to the missing fabric, including customer fabric. The Windows installer is verified by a silent installation before release.'
           }
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the installer.' }
