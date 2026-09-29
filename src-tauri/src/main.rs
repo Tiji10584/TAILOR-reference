@@ -1726,7 +1726,7 @@ mod invoice_fabric_tests{
   let complete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"}},{"fabricItemId":null,"fabric":{"اسم القماش":"قماش العميل"}}]}"#;
   let incomplete=r#"{"thobes":[{"fabricItemId":12,"fabric":{"اسم القماش":"قطن"}},{"fabricItemId":null,"fabric":{"اسم القماش":""}}]}"#;
   assert!(validate_invoice_fabrics(complete,2).is_ok());
-  assert!(validate_invoice_fabrics(incomplete,2).unwrap_err().contains("الثوب 2"));
+  assert!(validate_invoice_fabrics(incomplete,2).unwrap_err().contains("للثوب 2"));
   assert!(validate_invoice_fabrics(complete,3).is_err());
  }
 }
