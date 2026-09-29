@@ -1,6 +1,6 @@
 # TAILOR 0.2.9: distribution and offline activation
 
-The Windows installer is built by the **Windows installer** GitHub Actions workflow and published under the repository's **Releases** page as `TAILOR_0.2.9_x64-setup.exe`. It can also be built on a configured Windows developer PC with `npm.cmd run tauri build`. The local NSIS setup program appears in `src-tauri/target/release/bundle/nsis/`. The installer includes the WebView2 offline installer, so the recipient does not need development tools or an internet connection to install.
+Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.2.9_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
 
 Version 0.2.9 counts invoice debt when the paid amount or discount is empty. The dashboard refreshes when opened, on focus, and while visible; direct moves to a completed stage record the tailoring date. Financial reports accept inclusive custom **from** and **to** dates, with daily, monthly, and yearly shortcuts. The report preview and printed sheet show both dates.
 

@@ -23,60 +23,11 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install frontend dependencies
-        run: npm install
-      - name: Build frontend and Windows icon
-        run: npm run build
-      - name: Test grouping measurement sheets
-        run: npm run test:measurements
-      - name: Test license issuing with expiration and permanence
-        run: npm run test:license
-      - name: Test license verification and Rust commands
-        run: cargo test --manifest-path src-tauri/Cargo.toml --release
-      - name: Verify release opens without a console window
-        shell: pwsh
-        run: |
-          cargo build --manifest-path src-tauri/Cargo.toml --release
-          if ($LASTEXITCODE -ne 0) { throw 'Windows release executable failed to build.' }
-          $exe = 'src-tauri/target/release/tailor-workspace.exe'
-          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $exe))
-          $pe = [BitConverter]::ToInt32($bytes, 0x3c)
-          $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 24 + 68)
-          if ($subsystem -ne 2) { throw "Expected Windows GUI subsystem (2), got $subsystem." }
-      - name: Build standalone Windows installer
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $false
-          $success = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            npm run tauri build
-            if ($LASTEXITCODE -eq 0) { $success = $true; break }
-            if ($attempt -lt 3) { Start-Sleep -Seconds 15 }
-          }
-          if (-not $success) { throw 'Could not build the Windows installer after three attempts.' }
-      - name: Verify installer and show SHA-256
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
-          if (-not $installer) { throw 'Windows installer was not created.' }
-          Get-FileHash $installer.FullName -Algorithm SHA256 | Format-List
-      - name: Check NSIS installer integrity by installing silently
-        shell: pwsh
-        run: |
-          $installer = (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName
-          $process = Start-Process -FilePath $installer -ArgumentList "/S" -PassThru -Wait
-          if ($process.ExitCode -ne 0) { throw "Installer failed its integrity or install check: $($process.ExitCode)" }
-      - name: Publish installer to GitHub Releases
+      - name: Build, test, and publish the Windows installer
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          $installer = (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName
-          gh release view v0.2.9 *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload v0.2.9 "$installer" --clobber
-          } else {
-            gh release create v0.2.9 "$installer" --target "$env:GITHUB_SHA" --title 'TAILOR 0.2.9' --notes 'Count invoice debt when payment or discount is blank; refresh dashboard counts and record direct tailoring transitions consistently. Support inclusive custom financial report date ranges and test all three calculations. The Windows installer is verified by silent installation.'
-          }
-          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the installer.' }
+        run: node scripts/build-installer.mjs --verify-install --publish
+      - name: Build and test without publishing
+        if: github.event_name != 'push'
+        run: node scripts/build-installer.mjs --verify-install
