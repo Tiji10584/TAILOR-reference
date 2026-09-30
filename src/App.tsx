@@ -49,7 +49,7 @@ type ThobeSize = "كبير"|"صغير";
 type ThobeDraft = {measurements:Record<string,string>;fabric:Record<string,string>;fabricItemId:number|null;fabricMeters:string;fabricUnit:FabricLengthUnit;designs:Record<string,DesignOption|undefined>;thobeType:string;sleeveMode:SleeveMode;collarMode:CollarMode;neckButtonCount:"1"|"2";neckButtonType:NeckButtonType;workerName:string;tailorName:string;sizeCategory:ThobeSize;sizeOverride:boolean;cutPrice:string;cutPriceOverride:boolean;tailorPrice:string;tailorPriceOverride:boolean;notes:string};
 type FinanceSection = "home"|"workers"|"garments"|"basics";
 type PrintTarget = "measurements"|"receipt"|"laundry"|"extra"|"report"|"supplier"|"supply"|"finance";
-type OrderAction = "save"|"save-exit"|"measurements"|"receipt"|"laundry";
+type OrderAction = "save"|"save-exit"|"measurements"|"receipt"|"laundry"|"laundry-measurements";
 type ShortageWarning = { action:OrderAction; items:{name:string;available:number;required:number}[] };
 type View = "dashboard"|"add-customer"|"customers"|"order"|"settings"|"suppliers"|"inventory"|"ready-production"|"income"|"whatsapp"|"finance"|"notes"|"report"|"access"|"overdue"|"bulk-transfer";
 const paymentMethods=["كاش","شبكة","تحويل"] as const;
@@ -187,7 +187,7 @@ export default function App(){
   const customerSearchRequest=useRef(0);
   const [designOptions,setDesignOptions]=useState<DesignOption[]>([]);const [settingsCategory,setSettingsCategory]=useState(defaultCategories[0]);const [optionName,setOptionName]=useState("");const [optionImage,setOptionImage]=useState("");const [settingsError,setSettingsError]=useState("");const [pickerCategory,setPickerCategory]=useState<string|null>(null);const [selectedDesigns,setSelectedDesigns]=useState<Record<string,DesignOption|undefined>>({});
   const [measurements,setMeasurements]=useState<Record<string,string>>(()=>blankFields(measurementFields));const [fabric,setFabric]=useState<Record<string,string>>(()=>blankFields(fabricFields));const [fabricItemId,setFabricItemId]=useState<number|null>(null);const [fabricMeters,setFabricMeters]=useState("");const [fabricUnit,setFabricUnit]=useState<FabricLengthUnit>(DEFAULT_ORDER_FABRIC_UNIT);const [fabricQuery,setFabricQuery]=useState("");const [orderFabricKind,setOrderFabricKind]=useState<FabricKind>("أبيض");const [orderFabricGroup,setOrderFabricGroup]=useState("");const [unit,setUnit]=useState<"سم"|"إنش">("إنش");const [workerName,setWorkerName]=useState("");const [tailorName,setTailorName]=useState("");const [workers,setWorkers]=useState<WorkerProfile[]>([]);const [thobeSize,setThobeSize]=useState<ThobeSize>("صغير");const [sizeOverride,setSizeOverride]=useState(false);const [cutPrice,setCutPrice]=useState("");const [cutPriceOverride,setCutPriceOverride]=useState(false);const [tailorPrice,setTailorPrice]=useState("");const [tailorPriceOverride,setTailorPriceOverride]=useState(false);const [weight,setWeight]=useState("");const [deliveryDate,setDeliveryDate]=useState(()=>deliveryAfter(5));const [dayCount,setDayCount]=useState("5");const [totalThobes,setTotalThobes]=useState("1");const [thobeType,setThobeType]=useState("سعودي");const [sleeveMode,setSleeveMode]=useState<SleeveMode>("سادة");const [collarMode,setCollarMode]=useState<CollarMode>("قلاب");const [neckButtonCount,setNeckButtonCount]=useState<"1"|"2">("1");const [neckButtonType,setNeckButtonType]=useState<"طقطق"|"بلاستيك">("طقطق");const [notes,setNotes]=useState("");const [thobeDrafts,setThobeDrafts]=useState<ThobeDraft[]>(()=>[blankThobe()]);const [currentThobe,setCurrentThobe]=useState(0);
-  const [totalPrice,setTotalPrice]=useState("");const [paidAmount,setPaidAmount]=useState("");const [discount,setDiscount]=useState("");const [paymentMethod,setPaymentMethod]=useState("كاش");const [paymentMode,setPaymentMode]=useState<"single"|"split">("single");const [initialSplit,setInitialSplit]=useState<SplitAmounts>(emptySplitAmounts);const [invoice,setInvoice]=useState<InvoiceRecord|null>(null);const [orderLocked,setOrderLocked]=useState(false);const [savingInvoice,setSavingInvoice]=useState(false);const [orderMessage,setOrderMessage]=useState("");const [missingFabricThobe,setMissingFabricThobe]=useState<number|null>(null);const [missingTailorThobe,setMissingTailorThobe]=useState<number|null>(null);const [shortageWarning,setShortageWarning]=useState<ShortageWarning|null>(null);const [shortageAcknowledged,setShortageAcknowledged]=useState(false);const [previewTarget,setPreviewTarget]=useState<PrintTarget|null>(null);
+  const [totalPrice,setTotalPrice]=useState("");const [paidAmount,setPaidAmount]=useState("");const [discount,setDiscount]=useState("");const [paymentMethod,setPaymentMethod]=useState("كاش");const [paymentMode,setPaymentMode]=useState<"single"|"split">("single");const [initialSplit,setInitialSplit]=useState<SplitAmounts>(emptySplitAmounts);const [invoice,setInvoice]=useState<InvoiceRecord|null>(null);const [orderLocked,setOrderLocked]=useState(false);const [savingInvoice,setSavingInvoice]=useState(false);const [orderMessage,setOrderMessage]=useState("");const [missingFabricThobe,setMissingFabricThobe]=useState<number|null>(null);const [missingTailorThobe,setMissingTailorThobe]=useState<number|null>(null);const [shortageWarning,setShortageWarning]=useState<ShortageWarning|null>(null);const [shortageAcknowledged,setShortageAcknowledged]=useState(false);const [previewTarget,setPreviewTarget]=useState<PrintTarget|null>(null);const [combinedPrintStep,setCombinedPrintStep]=useState<"laundry"|"measurements"|null>(null);const combinedPrintingRef=useRef(false);
   const [printNavigationWarning,setPrintNavigationWarning]=useState(false);
   const [availablePrinters,setAvailablePrinters]=useState<string[]>([]);
   const [a4Printer,setA4Printer]=useState(()=>window.localStorage.getItem("tailor-a4-printer")||"");
@@ -212,7 +212,7 @@ export default function App(){
   const initialParts=paymentMethods.map(method=>({method,amount:numericValue(initialSplit[method])})).filter(part=>part.amount>0);const initialSplitTotal=Math.round(initialParts.reduce((sum,part)=>sum+Math.round(part.amount*100),0))/100;const total=numericValue(totalPrice),paid=paymentMode==="split"&&!invoice?initialSplitTotal:numericValue(paidAmount),discountValue=numericValue(discount),remaining=Math.max(0,total-paid-discountValue);const selectedTailor=workers.find(item=>item.name===tailorName&&item.role==="خياط");const automaticTailorPrice=selectedTailor?.payMode==="قطعة"?(thobeSize==="كبير"?selectedTailor.largeRate:selectedTailor.smallRate):0;const categories=useMemo(()=>Array.from(new Set([...defaultCategories,...designOptions.map(option=>option.category)])),[designOptions]);
   useEffect(()=>{if(view==="settings")void invoke<string[]>("list_printers").then(setAvailablePrinters).catch(()=>setAvailablePrinters([]))},[view]);
   useEffect(()=>{
-    if(!previewTarget)return;
+    if(!previewTarget||combinedPrintStep)return;
     const onPrintShortcut=(event:globalThis.KeyboardEvent)=>{
       if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="p"){
         event.preventDefault();
@@ -222,7 +222,25 @@ export default function App(){
     };
     window.addEventListener("keydown",onPrintShortcut,true);
     return()=>window.removeEventListener("keydown",onPrintShortcut,true);
-  },[previewTarget]);
+  },[previewTarget,combinedPrintStep]);
+  useEffect(()=>{
+    if(!combinedPrintStep||previewTarget!==combinedPrintStep)return;
+    const frame=window.requestAnimationFrame(()=>{
+      if(combinedPrintingRef.current)return;
+      combinedPrintingRef.current=true;
+      void printSheet(combinedPrintStep).then(success=>{
+        combinedPrintingRef.current=false;
+        if(!success){
+          setOrderMessage(combinedPrintStep==="laundry"?"تعذرت طباعة المغسلة؛ لم تُرسل المقاسات للطباعة.":"طُبعت المغسلة، لكن تعذرت طباعة المقاسات.");
+          setCombinedPrintStep(null);return;
+        }
+        if(combinedPrintStep==="laundry"){
+          setCombinedPrintStep("measurements");setPreviewTarget("measurements");
+        }else{setCombinedPrintStep(null);setOrderMessage("اكتملت طباعة المغسلة والمقاسات دون فاتورة السعر.")}
+      }).catch(error=>{combinedPrintingRef.current=false;setCombinedPrintStep(null);setOrderMessage(`تعذرت الطباعة المشتركة: ${String(error)}`)});
+    });
+    return()=>window.cancelAnimationFrame(frame);
+  },[combinedPrintStep,previewTarget]);
 
 
   async function load(){const request=++dashboardRequest.current;try{setError("");const [dashboard,current,board]=await Promise.all([invoke<Dashboard>("dashboard_summary"),invoke<CurrentSession>("current_session"),invoke<WorkBoardItem[]>("work_board")]);setSession(current);if(request===dashboardRequest.current){setData(dashboard);setWorkItems(board)}}catch{if(request===dashboardRequest.current)setError("تعذر قراءة بيانات المحل المحلية.")}}
@@ -319,7 +337,7 @@ export default function App(){
   useEffect(()=>{if(view==="add-customer"){setCustomerName("");setCustomerPhone("");setCustomerError("")}},[view]);
   useEffect(()=>{const request=++reportRequest.current;if(view!=="report")return;setDailyReportData(null);if(!reportDate||!reportEndDate)return;if(reportEndDate<reportDate){setReportMessage("تاريخ إلى يجب أن يكون بعد تاريخ من أو مساويًا له");return}setReportMessage("");const timer=window.setTimeout(()=>void loadDailyReport(reportDate,reportEndDate,reportPeriod,request),120);return()=>window.clearTimeout(timer)},[reportDate,reportEndDate,reportPeriod,view]);
   function closeCustomer(){setCustomerName("");setCustomerPhone("");setCustomerError("");setView("dashboard")}
-  async function saveCustomer(event:FormEvent<HTMLFormElement>){event.preventDefault();const name=customerName.trim(),phone=latinDigits(customerPhone).trim();if(!name){setCustomerError("اكتب اسم العميل.");return}if(phone.replace(/\D/g,"").length<7){setCustomerError("اكتب رقم جوال صحيحًا بالأرقام الإنجليزية.");return}try{setSavingCustomer(true);setCustomerError("");const customer=await invoke<Customer>("create_customer",{name,phone});setCurrentCustomer(customer);setOrderReturnView("dashboard");resetInvoice();setView("order")}catch{setCustomerError("تعذر حفظ العميل. حاول مرة أخرى.")}finally{setSavingCustomer(false)}}
+  async function saveCustomer(event:FormEvent<HTMLFormElement>){event.preventDefault();const name=customerName.trim(),phone=latinDigits(customerPhone).trim();if(!name){setCustomerError("اكتب اسم العميل.");return}if(phone.replace(/\D/g,"").length<7){setCustomerError("اكتب رقم جوال صحيحًا بالأرقام الإنجليزية.");return}try{setSavingCustomer(true);setCustomerError("");const customer=await invoke<Customer>("create_customer",{name,phone});setCurrentCustomer(customer);setOrderReturnView("dashboard");resetInvoice();setView("order")}catch(error){setCustomerError(String(error).replace(/^Error:\s*/,"")||"تعذر حفظ العميل. حاول مرة أخرى.")}finally{setSavingCustomer(false)}}
   async function searchCustomerRecords(query=customerQuery){
     const request=++customerSearchRequest.current;
     try{setCustomerSearchBusy(true);setCustomerSearchMessage("");const results=await invoke<CustomerSearchItem[]>("search_customers",{query:query.trim()});if(request===customerSearchRequest.current)setCustomerResults(results)}
@@ -523,15 +541,19 @@ export default function App(){
   function exitWithoutSave(){const destination=orderReturnView;setCurrentCustomer(null);resetInvoice();setView(destination)}
   async function saveAndExit(acknowledgedShortage=false){if(!orderLocked){const saved=await saveInvoice("save-exit",acknowledgedShortage);if(!saved)return}const destination=orderReturnView;setCurrentCustomer(null);setView(destination);await load();if(destination==="customers"){await searchCustomerRecords(customerQuery);if(selectedCustomer)await selectCustomerRecord(selectedCustomer)}}
   async function ensureInvoiceSaved(target:OrderAction,acknowledgedShortage=false){if(invoice&&orderLocked)return true;return saveInvoice(target,acknowledgedShortage)}
-  async function openPrintPreview(target:PrintTarget,acknowledgedShortage=false){
+  async function openPrintPreview(target:PrintTarget|"laundry-measurements",acknowledgedShortage=false){
     if(view==="order"&&!requireFabricSelection(completeThobeDrafts()))return;
     if(view==="order"&&!requireTailorSelection(completeThobeDrafts()))return;
-    if(view==="order"&&["measurements","receipt","laundry"].includes(target)&&!isFinalThobeSelected(currentThobe,Number(totalThobes))){
+    if(view==="order"&&["measurements","receipt","laundry","laundry-measurements"].includes(target)&&!isFinalThobeSelected(currentThobe,Number(totalThobes))){
       setPrintNavigationWarning(true);return;
     }
     setPrintNavigationWarning(false);
     if(view==="order"&&!acknowledgedShortage&&!requireStockConfirmation(completeThobeDrafts(),target as OrderAction))return;
-    if(await ensureInvoiceSaved(target as OrderAction,acknowledgedShortage))setPreviewTarget(target);
+    if(await ensureInvoiceSaved(target as OrderAction,acknowledgedShortage)){
+      if(target==="laundry-measurements"){
+        setCombinedPrintStep("laundry");setPreviewTarget("laundry");
+      }else setPreviewTarget(target);
+    }
   }
   async function selectImage(event:ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];if(!file)return;try{setOptionImage(await imageFromFile(file));setSettingsError("")}catch{setSettingsError("تعذر قراءة الصورة.")}}
   async function addDesignOption(event:FormEvent<HTMLFormElement>){event.preventDefault();if(!settingsCategory.trim()||!optionName.trim()||!optionImage){setSettingsError("اكتب اسم النوع واختر صورته.");return}try{await invoke("add_design_option",{category:settingsCategory.trim(),name:optionName.trim(),imageData:optionImage});setOptionName("");setOptionImage("");setSettingsError("");await loadDesignOptions()}catch{setSettingsError("تعذر حفظ النوع والصورة.")}}
@@ -548,7 +570,7 @@ export default function App(){
     }catch(error){setStorageMessage(String(error))}finally{setStorageBusy(false)}
   }
   async function deleteDesignOption(id:number){try{await invoke("delete_design_option",{id});setSelectedDesigns(current=>Object.fromEntries(Object.entries(current).filter(([,option])=>option?.id!==id)));await loadDesignOptions()}catch{setSettingsError("تعذر حذف النوع.")}}
-  async function printSheet(target:PrintTarget){
+  async function printSheet(target:PrintTarget):Promise<boolean>{
     const selectors:Record<PrintTarget,string>={
       measurements:".measurement-print-stack",receipt:".customer-receipt-stack",
       laundry:".laundry-print-stack",extra:".extra-receipt",report:".report-print-sheet",
@@ -557,9 +579,9 @@ export default function App(){
     const thermal=target==="receipt"||target==="laundry";
     const halfA4Measurement=target==="measurements";
     const source=document.querySelector<HTMLElement>(`.print-area ${selectors[target]}`);
-    if(!source?.querySelector(".paper")&&!source?.classList.contains("paper"))return;
+    if(!source?.querySelector(".paper")&&!source?.classList.contains("paper"))return false;
     if("__TAURI_INTERNALS__" in window){
-      if(document.documentElement.hasAttribute("data-print-target"))return;
+      if(document.documentElement.hasAttribute("data-print-target"))return false;
       const slips=Array.from(document.querySelectorAll<HTMLElement>(".preview-sheets .receipt-paper"));
       const pageHeightMm=thermal?Math.max(80,...slips.map(paper=>Math.ceil(Math.max(paper.scrollHeight,paper.getBoundingClientRect().height)*25.4/96)+18)):(halfA4Measurement?148.5:297);
       const pageRule=document.createElement("style");
@@ -572,20 +594,21 @@ export default function App(){
         await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
         await invoke("print_direct",{thermal,pageHeightMm,printerName:thermal?thermalPrinter:a4Printer});
         setPreviewTarget(null);
+        return true;
       }catch(error){
         window.alert(`تعذرت الطباعة المباشرة. تأكد من توصيل الطابعة المحددة في الإعدادات. التفاصيل: ${String(error)}`);
+        return false;
       }finally{
         delete document.documentElement.dataset.printTarget;
         pageRule.remove();
       }
-      return;
     }
     const frame=document.createElement("iframe");
     frame.title=`طباعة ${target}`;
     frame.style.cssText=`position:fixed;left:-10000px;top:0;width:${thermal?"80mm":"210mm"};height:${halfA4Measurement?"148.5mm":"297mm"};border:0;opacity:0;pointer-events:none`;
     document.body.appendChild(frame);
     const printDocument=frame.contentDocument,printWindow=frame.contentWindow;
-    if(!printDocument||!printWindow){frame.remove();return}
+    if(!printDocument||!printWindow){frame.remove();return false}
     printDocument.open();
     printDocument.write('<!doctype html><html lang="ar"><head><meta charset="UTF-8"></head><body></body></html>');
     printDocument.close();
@@ -638,7 +661,7 @@ export default function App(){
     await Promise.all(styleLoads);
     await Promise.race([printDocument.fonts.ready,new Promise<void>(resolve=>window.setTimeout(resolve,3000))]);
     await Promise.all(Array.from(printDocument.images).map(image=>image.decode().catch(()=>{})));
-    if(!frame.isConnected)return;
+    if(!frame.isConnected)return false;
     if(thermal){
       const heights=Array.from(printDocument.querySelectorAll<HTMLElement>(".receipt-paper"),paper=>Math.ceil(Math.max(paper.scrollHeight,paper.getBoundingClientRect().height)*25.4/96));
       const pageHeight=Math.max(70,...heights)+6;
@@ -650,7 +673,7 @@ export default function App(){
     const finish=()=>{printWindow.removeEventListener("afterprint",finish);window.clearTimeout(cleanupTimer);frame.remove()};
     printWindow.addEventListener("afterprint",finish,{once:true});
     cleanupTimer=window.setTimeout(finish,120000);
-    try{printWindow.focus();printWindow.print()}catch{finish()}
+    try{printWindow.focus();printWindow.print();return true}catch{finish();return false}
   }
   function measurementInput(field:string){return <label className="compact-field" key={field}><span>{field}</span><div className="measure-input-wrap"><input className="numeric" disabled={orderLocked} value={measurements[field]||""} onChange={event=>setMeasurements(current=>({...current,[field]:latinDigits(event.target.value)}))} placeholder="—"/><small className="measure-unit-badge">{unit}</small></div></label>}
   function bodyLengthInput(){return <label className="compact-field body-length-field"><span>الطول</span><div className="named-dual-measure"><label><em>أمام</em><input className="numeric" disabled={orderLocked} value={measurements["طول أمام"]||""} onChange={event=>changeBodyLength("طول أمام",event.target.value)} placeholder="—"/></label><label><em>خلف</em><input className="numeric" disabled={orderLocked} value={measurements["طول خلف"]||""} onChange={event=>changeBodyLength("طول خلف",event.target.value)} placeholder="—"/></label><small className="measure-unit-badge">{unit}</small></div></label>}
@@ -894,7 +917,7 @@ export default function App(){
         <div className="compact-remaining"><span>المتبقي</span><b className="numeric">{numberFormat.format(remaining)} ر.س</b></div>
       </section>
 
-      <section className="order-actions compact-order-actions"><button className="primary-action" type="button" disabled={savingInvoice||orderLocked||fabricSaveBlocked} onClick={()=>void saveInvoice()}>{savingInvoice?"جارٍ الحفظ…":"حفظ الفاتورة"}</button><button type="button" disabled={!invoice||!orderLocked} onClick={()=>{setOrderLocked(false);setOrderMessage("وضع التعديل مفتوح")}}>تعديل</button><button type="button" disabled={savingInvoice} onClick={()=>void openPrintPreview("receipt")}>فاتورة السعر</button><button type="button" disabled={savingInvoice} onClick={()=>void openPrintPreview("laundry")}>فاتورة المغسلة</button><button type="button" disabled={savingInvoice} onClick={()=>void openPrintPreview("measurements")}>طباعة المقاس</button><button type="button" onClick={resetInvoice}>فاتورة جديدة</button>{orderMessage&&<p>{orderMessage}</p>}</section>
+      <section className="order-actions compact-order-actions"><button className="primary-action" type="button" disabled={savingInvoice||orderLocked||fabricSaveBlocked} onClick={()=>void saveInvoice()}>{savingInvoice?"جارٍ الحفظ…":"حفظ الفاتورة"}</button><button type="button" disabled={!invoice||!orderLocked} onClick={()=>{setOrderLocked(false);setOrderMessage("وضع التعديل مفتوح")}}>تعديل</button><button type="button" disabled={savingInvoice} onClick={()=>void openPrintPreview("receipt")}>فاتورة السعر</button><button type="button" disabled={savingInvoice} onClick={()=>void openPrintPreview("laundry")}>فاتورة المغسلة</button><button type="button" disabled={savingInvoice} onClick={()=>void openPrintPreview("measurements")}>طباعة المقاس</button><button type="button" disabled={savingInvoice||combinedPrintStep!==null} onClick={()=>void openPrintPreview("laundry-measurements")}>{combinedPrintStep?"جارٍ الطباعة…":"طباعة المغسلة والمقاسات"}</button><button type="button" onClick={resetInvoice}>فاتورة جديدة</button>{orderMessage&&<p>{orderMessage}</p>}</section>
     </section>}
     {view==="settings"&&<section className="settings-page settings-page-v2" dir="rtl">
       <header className="settings-hero">
@@ -979,7 +1002,7 @@ export default function App(){
     </section>}
     {pickerCategory&&<div className="picker-overlay" onMouseDown={()=>setPickerCategory(null)}><section className="picker-dialog" dir="rtl" onMouseDown={event=>event.stopPropagation()}><header><div><span>اختيار النوع</span><h2>{pickerCategory}</h2></div><button type="button" onClick={()=>setPickerCategory(null)}>×</button></header><div className="picker-options">{designOptions.filter(option=>option.category===pickerCategory).length===0&&<div className="picker-empty"><p>لا توجد صور مضافة لهذا القسم.</p><button type="button" onClick={()=>{setSettingsCategory(pickerCategory);setPickerCategory(null);setView("settings")}}>إضافتها من الإعدادات</button></div>}{designOptions.filter(option=>option.category===pickerCategory).map(option=><button type="button" key={option.id} onClick={()=>{setSelectedDesigns(current=>({...current,[pickerCategory]:option}));if(pickerCategory==="نوع الثوب"&&(thobeTypes as readonly string[]).includes(option.name))setThobeType(option.name);setPickerCategory(null)}}><img src={option.imageData} alt={option.name}/><b>{option.name}</b></button>)}</div>{selectedDesigns[pickerCategory]&&<button className="remove-choice" type="button" onClick={()=>{setSelectedDesigns(current=>({...current,[pickerCategory]:undefined}));setPickerCategory(null)}}>إلغاء اختيار هذا القسم</button>}</section></div>}
     {movementFabric&&<div className="picker-overlay" onMouseDown={()=>setMovementFabric(null)}><section className="movement-dialog" dir="rtl" onMouseDown={event=>event.stopPropagation()}><header><div><span>سجل المخزون</span><h2>{fabrics.find(item=>item.id===movementFabric)?fabricLabel(fabrics.find(item=>item.id===movementFabric)!):""}</h2></div><button type="button" onClick={()=>setMovementFabric(null)}>×</button></header><form className="restock-form restock-expanded" onSubmit={event=>void restockSelectedFabric(event)}><div className="supply-unit-switch"><button type="button" className={restockUnit==="متر"?"selected":""} onClick={()=>setRestockUnit("متر")}>توريد بالمتر</button><button type="button" className={restockUnit==="ياردة"?"selected":""} onClick={()=>setRestockUnit("ياردة")}>توريد بالياردة</button><button type="button" className={restockUnit==="كرتون"?"selected":""} onClick={()=>setRestockUnit("كرتون")}>توريد بالكرتون</button></div>{restockUnit!=="كرتون"?<><label><span>إضافة {restockUnit==="ياردة"?"ياردات":"أمتار"}</span><input className="numeric" value={restockMeters} onChange={event=>setRestockMeters(latinDigits(event.target.value))}/></label><label><span>سعر شراء الـ{restockUnit}</span><input className="numeric" value={restockPrice} onChange={event=>setRestockPrice(latinDigits(event.target.value))}/></label></>:<><label><span>عدد الكراتين</span><input className="numeric" value={restockCartons} onChange={event=>setRestockCartons(latinDigits(event.target.value))}/></label><label><span>متر/كرتون</span><input className="numeric" value={restockMetersPerCarton} onChange={event=>setRestockMetersPerCarton(latinDigits(event.target.value))}/></label><label><span>سعر الكرتون كامل</span><input className="numeric" value={restockPrice} onChange={event=>setRestockPrice(latinDigits(event.target.value))}/></label></>}<label><span>ملاحظة</span><input value={restockNotes} onChange={event=>setRestockNotes(event.target.value)} placeholder="رقم فاتورة المورد"/></label><div className="restock-result"><span><b className="numeric">{numberFormat.format(restockTotalMeters)}</b> متر</span><span>تكلفة المتر <b className="numeric">{numberFormat.format(restockMeterCost)}</b> ر.س</span><strong>قيمة التوريد المضافة لدين المورد: <b className="numeric">{numberFormat.format(restockTotalCost)}</b> ر.س</strong></div><button type="submit">إضافة للمخزون</button></form><div className="movement-list">{fabricMovements.length===0&&<p>لا توجد حركات.</p>}{fabricMovements.map(item=><article key={item.id}><div><strong>{item.movementType}</strong><small className="numeric">{dateFormat.format(databaseDate(item.createdAt))}</small></div><b className={`numeric ${item.meters<0?"out":"in"}`}>{item.meters>0?"+":""}{numberFormat.format(item.meters)} متر</b><span>الرصيد: <b className="numeric">{numberFormat.format(item.balanceAfter)}</b> متر</span><p>{item.entryUnit==="ياردة"?<>{numberFormat.format(fromMeters(item.meters,"ياردة"))} ياردة · </>:null}{item.entryUnit==="كرتون"&&item.cartonCount>0?<><b className="numeric">{numberFormat.format(item.cartonCount)}</b> كرتون × <b className="numeric">{numberFormat.format(item.metersPerCarton)}</b> م · سعر الكرتون <b className="numeric">{numberFormat.format(item.metersPerCarton*item.unitCost)}</b> ر.س · </>:null}{item.notes}</p></article>)}</div></section></div>}
-    {previewTarget&&["measurements","receipt","laundry"].includes(previewTarget)&&currentCustomer&&<div className="preview-overlay" onMouseDown={()=>setPreviewTarget(null)}><section className={`preview-dialog ${previewTarget==="measurements"?"":"thermal-dialog"}`} onMouseDown={event=>event.stopPropagation()}><div className="preview-tools"><b>{previewTitle}</b><button type="button" onClick={()=>printSheet(previewTarget)}>طباعة الآن</button><button type="button" onClick={()=>setPreviewTarget(null)}>إغلاق</button></div><div className={`preview-sheets ${previewTarget==="measurements"?"":"thermal-preview"}`}>{previewTarget==="measurements"&&measurementSheets.map((sheet,index)=><MeasurementSheet key={index} {...sheet}/>)}{previewTarget==="receipt"&&<CustomerReceiptSheet shopName={appSettings.shopName} customer={currentCustomer} invoice={invoice} thobes={outputDrafts} total={total} paid={paid} discount={discountValue} remaining={remaining} paymentMethod={paymentMethod} deliveryDate={deliveryDate}/>} {previewTarget==="laundry"&&outputDrafts.map((thobe,index)=><LaundryReceiptSheet key={index} shopName={appSettings.shopName} customer={currentCustomer} invoice={invoice} thobe={thobe} index={index} total={outputDrafts.length} deliveryDate={deliveryDate}/>)}</div></section></div>}
+    {previewTarget&&["measurements","receipt","laundry"].includes(previewTarget)&&currentCustomer&&<div className="preview-overlay" onMouseDown={()=>{if(!combinedPrintStep)setPreviewTarget(null)}}><section className={`preview-dialog ${previewTarget==="measurements"?"":"thermal-dialog"}`} onMouseDown={event=>event.stopPropagation()}><div className="preview-tools"><b>{combinedPrintStep?"جارٍ طباعة المغسلة والمقاسات…":previewTitle}</b>{!combinedPrintStep&&<><button type="button" onClick={()=>void printSheet(previewTarget)}>طباعة الآن</button><button type="button" onClick={()=>setPreviewTarget(null)}>إغلاق</button></>}</div><div className={`preview-sheets ${previewTarget==="measurements"?"":"thermal-preview"}`}>{previewTarget==="measurements"&&measurementSheets.map((sheet,index)=><MeasurementSheet key={index} {...sheet}/>)}{previewTarget==="receipt"&&<CustomerReceiptSheet shopName={appSettings.shopName} customer={currentCustomer} invoice={invoice} thobes={outputDrafts} total={total} paid={paid} discount={discountValue} remaining={remaining} paymentMethod={paymentMethod} deliveryDate={deliveryDate}/>} {previewTarget==="laundry"&&outputDrafts.map((thobe,index)=><LaundryReceiptSheet key={index} shopName={appSettings.shopName} customer={currentCustomer} invoice={invoice} thobe={thobe} index={index} total={outputDrafts.length} deliveryDate={deliveryDate}/>)}</div></section></div>}
     {previewTarget==="extra"&&extraReceipt&&<div className="preview-overlay" onMouseDown={()=>setPreviewTarget(null)}><section className="preview-dialog a5-preview-dialog" onMouseDown={event=>event.stopPropagation()}><div className="preview-tools"><b>{previewTitle}</b><button type="button" onClick={()=>printSheet("extra")}>طباعة الآن</button><button type="button" onClick={()=>setPreviewTarget(null)}>إغلاق</button></div><div className="preview-sheets half-a4-preview"><ExtraReceiptSheet shopName={appSettings.shopName} transaction={extraReceipt}/></div></section></div>}
     {previewTarget==="report"&&dailyReportData&&<div className="preview-overlay" onMouseDown={()=>setPreviewTarget(null)}><section className="preview-dialog a5-preview-dialog" onMouseDown={event=>event.stopPropagation()}><div className="preview-tools"><b>{previewTitle}</b><button type="button" onClick={()=>printSheet("report")}>طباعة الآن</button><button type="button" onClick={()=>setPreviewTarget(null)}>إغلاق</button></div><div className="preview-sheets"><FinancialReportSheet report={dailyReportData} shopName={appSettings.shopName} ownerName={appSettings.ownerName}/></div></section></div>}
     {previewTarget==="supplier"&&supplierReceipt&&<div className="preview-overlay" onMouseDown={()=>setPreviewTarget(null)}><section className="preview-dialog a5-preview-dialog" onMouseDown={event=>event.stopPropagation()}><div className="preview-tools"><b>{previewTitle}</b><button type="button" onClick={()=>printSheet("supplier")}>طباعة الآن</button><button type="button" onClick={()=>setPreviewTarget(null)}>إغلاق</button></div><div className="preview-sheets"><SupplierPaymentSheet payment={supplierReceipt} shopName={appSettings.shopName} ownerName={appSettings.ownerName}/></div></section></div>}

@@ -849,16 +849,66 @@ fn session_history(app:AppHandle)->Result<Vec<SessionEntry>,String>{
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
+fn normalized_customer_phone(phone:&str)->String{
+ let digits:String=phone.chars().filter_map(|character|match character{
+  '0'..='9'=>Some(character),
+  '٠'..='٩'=>Some(char::from(b'0'+(character as u32-'٠' as u32) as u8)),
+  '۰'..='۹'=>Some(char::from(b'0'+(character as u32-'۰' as u32) as u8)),
+  _=>None
+ }).collect();
+ let international=digits.strip_prefix("00").unwrap_or(&digits);
+ if international.len()==12&&international.starts_with("9665"){
+  format!("0{}",&international[3..])
+ }else{international.to_string()}
+}
+
+fn ensure_customer_phone_available(conn:&Connection,phone:&str,except_id:Option<i64>)->Result<(),String>{
+ let normalized=normalized_customer_phone(phone);
+ let mut statement=conn.prepare("SELECT id,name,phone FROM customers").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok((row.get::<_,i64>(0)?,row.get::<_,String>(1)?,row.get::<_,String>(2)?))).map_err(|e|e.to_string())?;
+ for row in rows{
+  let (id,name,stored_phone)=row.map_err(|e|e.to_string())?;
+  if Some(id)!=except_id&&normalized_customer_phone(&stored_phone)==normalized{
+   return Err(format!("رقم الجوال موجود مسبقًا للعميل {name}. افتح سجل العميل الموجود بدلًا من إضافته مرة ثانية."))
+  }
+ }
+ Ok(())
+}
+
+#[cfg(test)]
+mod customer_phone_tests{
+ use super::{ensure_customer_phone_available,normalized_customer_phone};
+ use rusqlite::Connection;
+
+ #[test]
+ fn local_and_international_saudi_numbers_match(){
+  assert_eq!(normalized_customer_phone("٠٥٠ ١٢٣-٤٥٦٧"),"0501234567");
+  assert_eq!(normalized_customer_phone("+966 50 123 4567"),"0501234567");
+  assert_eq!(normalized_customer_phone("00966 50 123 4567"),"0501234567");
+ }
+
+ #[test]
+ fn another_customer_cannot_reuse_phone_but_same_customer_can_keep_it(){
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE customers(id INTEGER PRIMARY KEY,name TEXT,phone TEXT);INSERT INTO customers VALUES(1,'علي','0501234567');").unwrap();
+  assert!(ensure_customer_phone_available(&conn,"+966 50 123 4567",None).unwrap_err().contains("موجود مسبقًا"));
+  assert!(ensure_customer_phone_available(&conn,"0501234567",Some(2)).is_err());
+  assert!(ensure_customer_phone_available(&conn,"0501234567",Some(1)).is_ok());
+  assert!(ensure_customer_phone_available(&conn,"0550000000",None).is_ok());
+ }
+}
+
 #[tauri::command]
 fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,String>{
  let name=name.trim().to_string();
  let phone=phone.trim().to_string();
  if name.is_empty(){return Err("اسم العميل مطلوب".into())}
- if phone.chars().filter(|character|character.is_ascii_digit()).count()<7{
+ if normalized_customer_phone(&phone).len()<7{
   return Err("رقم الجوال غير صحيح".into())
  }
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ ensure_customer_phone_available(&transaction,&phone,None)?;
  transaction.execute(
   "INSERT INTO customers(customer_code,name,phone,created_at) VALUES(NULL,?1,?2,datetime('now','localtime'))",
   params![&name,&phone]
@@ -874,10 +924,13 @@ fn create_customer(app:AppHandle,name:String,phone:String)->Result<Customer,Stri
 fn update_customer(app:AppHandle,customer_id:i64,name:String,phone:String)->Result<Customer,String>{
  let name=name.trim().to_string();let phone=phone.trim().to_string();
  if name.is_empty(){return Err("اسم العميل مطلوب".into())}
- if phone.chars().filter(|character|character.is_ascii_digit()).count()<7{return Err("رقم الجوال غير صحيح".into())}
- let conn=db(&app)?;
- let code:String=conn.query_row("SELECT customer_code FROM customers WHERE id=?1",[customer_id],|row|row.get(0)).map_err(|_|"العميل غير موجود".to_string())?;
- conn.execute("UPDATE customers SET name=?1,phone=?2 WHERE id=?3",params![&name,&phone,customer_id]).map_err(|e|e.to_string())?;
+ if normalized_customer_phone(&phone).len()<7{return Err("رقم الجوال غير صحيح".into())}
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let code:String=transaction.query_row("SELECT customer_code FROM customers WHERE id=?1",[customer_id],|row|row.get(0)).map_err(|_|"العميل غير موجود".to_string())?;
+ ensure_customer_phone_available(&transaction,&phone,Some(customer_id))?;
+ transaction.execute("UPDATE customers SET name=?1,phone=?2 WHERE id=?3",params![&name,&phone,customer_id]).map_err(|e|e.to_string())?;
+ transaction.commit().map_err(|e|e.to_string())?;
  Ok(Customer{id:customer_id,code,name,phone})
 }
 
