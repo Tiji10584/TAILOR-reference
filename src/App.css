@@ -5048,3 +5048,51 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .ready-card-actions button{border:1px solid #aabbaf;background:#edf3ed;border-radius:7px;padding:7px;cursor:pointer}
 .ready-card-details{margin-top:12px;padding-top:12px;border-top:1px solid #e5ddcf}
 @media(max-width:650px){.fabric-order-selection{grid-template-columns:1fr}.ready-grid{grid-template-columns:1fr}}
+
+/* Keep the customer shortcut next to the duplicate-phone warning. */
+.customer-duplicate-notice{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:16px}
+.customer-duplicate-notice .customer-error{margin:0}
+.customer-duplicate-notice button{min-height:36px;padding:5px 14px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.customer-duplicate-notice button:disabled{opacity:.65;cursor:wait}
+
+/* The fabric name/catalog and shade/color number share one compact row. */
+.order-page .fabric-search-picker{display:grid;gap:6px}
+.order-page .fabric-search-picker .fabric-kind-tabs{margin:0!important;gap:6px}
+.order-page .fabric-search-picker .fabric-kind-tabs button{min-height:30px;padding:3px 8px;border-color:var(--line-strong)!important;color:var(--text)!important;background:var(--surface)!important;font-size:.75rem}
+.order-page .fabric-search-picker .fabric-kind-tabs button.selected{border-color:var(--accent)!important;color:#fff!important;background:var(--accent)!important}
+.order-page .fabric-order-selection{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;align-items:end}
+.order-page .fabric-order-selection label{min-width:0;display:grid;gap:4px}
+.order-page .fabric-order-selection label>span{color:var(--text)!important;font-size:.76rem!important;font-weight:800;white-space:nowrap}
+.order-page .fabric-order-selection select{width:100%;min-width:0;height:32px;padding:0 5px;border:1px solid var(--line-strong);border-radius:7px;color:var(--text);background:var(--surface);font:700 .76rem Tahoma,"Segoe UI",Arial,sans-serif}
+.order-page .fabric-search-picker .customer-fabric-button{justify-self:start;min-height:27px;padding:3px 10px;border-radius:7px;font-size:.72rem}
+
+/* Use the free space at the left of the totals row for the payment choice. */
+.order-page .compact-finance>.payment-mode-switch{grid-column:auto;justify-self:start;align-self:center;display:flex;gap:4px;width:max-content;max-width:100%;min-height:44px;padding:4px}
+.order-page .compact-finance>.payment-mode-switch button{min-height:34px;padding:3px 7px;font-size:.72rem;white-space:nowrap}
+.order-page .compact-finance>.payment-split-fields{grid-column:span 2;align-self:center;gap:5px}
+.order-page .compact-finance>.payment-split-saved{grid-column:span 2;align-self:center}
+.order-page .compact-finance>.payment-split-fields label{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:5px;min-height:44px;padding:4px 6px}
+.order-page .compact-finance>.payment-split-fields label>span{white-space:nowrap;color:var(--text)!important;font-size:.72rem!important}
+.order-page .compact-finance>.payment-split-fields input{min-height:30px;height:30px!important;padding:0 5px!important}
+@media(min-width:1600px){
+ .order-page .compact-finance{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+ .order-page .compact-finance>.finance-total{grid-area:1/1/2/2}
+ .order-page .compact-finance>.payment-mode-switch{grid-area:1/7/2/8}
+ .order-page .compact-finance>label:not(.finance-total):not(.finance-paid):not(.finance-discount),
+ .order-page .compact-finance>.payment-split-fields,
+ .order-page .compact-finance>.payment-split-saved{grid-area:1/2/2/4}
+ .order-page .compact-finance>.finance-paid{grid-area:1/4/2/5}
+ .order-page .compact-finance>.finance-discount{grid-area:1/5/2/6}
+ .order-page .compact-finance>.compact-remaining{grid-area:1/6/2/7}
+}
+@media(min-width:761px) and (max-width:1599px){
+ .order-page .compact-finance{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+ .order-page .compact-finance>.payment-split-fields,
+ .order-page .compact-finance>.payment-split-saved{grid-column:span 2}
+}
+@media(max-width:760px){
+ .order-page .fabric-order-selection{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .order-page .compact-finance>.payment-mode-switch{grid-column:1/-1}
+ .order-page .compact-finance>.payment-split-fields{grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .order-page .compact-finance>.payment-split-fields label{display:grid;grid-template-columns:1fr;gap:2px}
+}

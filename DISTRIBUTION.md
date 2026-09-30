@@ -1,6 +1,6 @@
-# TAILOR 0.3.3: distribution and offline activation
+# TAILOR 0.3.4: distribution and offline activation
 
-Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.3.3_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
+Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.3.4_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
 
 Version 0.2.9 counts invoice debt when the paid amount or discount is empty. The dashboard refreshes when opened, on focus, and while visible; direct moves to a completed stage record the tailoring date. Financial reports accept inclusive custom **from** and **to** dates, with daily, monthly, and yearly shortcuts. The report preview and printed sheet show both dates.
 
@@ -8,7 +8,7 @@ Version 0.3.0 separates white and colored fabric in stock and tailoring, records
 
 New thobes start with yards as their input unit; previously saved thobes keep the unit used when saved. Inventory deduction remains in meters. When the required fabric exceeds available stock, the operator must explicitly acknowledge that the full deduction may result in a negative balance before saving or printing. Missing tailor selections are shown in a centered warning.
 
-Give customers **only the NSIS setup file**. Do not copy the full `G:\TAILOR-0.3.3` development folder or its debug builds to a customer device.
+Give customers **only the NSIS setup file**. Do not copy the full `G:\TAILOR-0.3.4` development folder or its debug builds to a customer device.
 
 ## Issue a license on the owner's computer
 
@@ -30,4 +30,4 @@ Development builds (`npm.cmd run tauri dev`) skip licensing to allow local testi
 
 Version 0.3.2 starts maximized while retaining window controls, corrects dashboard grid rows, supports split cash/network/transfer payments for initial invoices and later debt settlements with individual ledger entries, and advances Enter through ready-stock measurements in order.
 
-Version 0.3.3 prints the laundry slips and measurement sheets in sequence from one button, without the price receipt. Customer creation and editing reject a mobile number already used by another customer, including the Saudi +966 and 05 forms.
+Version 0.3.4 adds a button on the duplicate mobile warning to open that customer's record and measurements on demand, and makes the fabric and split payment controls smaller in the tailoring form. The combined laundry and measurement print button and duplicate mobile validation from 0.3.3 remain available.

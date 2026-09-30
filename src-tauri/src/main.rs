@@ -869,7 +869,7 @@ fn ensure_customer_phone_available(conn:&Connection,phone:&str,except_id:Option<
  for row in rows{
   let (id,name,stored_phone)=row.map_err(|e|e.to_string())?;
   if Some(id)!=except_id&&normalized_customer_phone(&stored_phone)==normalized{
-   return Err(format!("رقم الجوال موجود مسبقًا للعميل {name}. افتح سجل العميل الموجود بدلًا من إضافته مرة ثانية."))
+   return Err(format!("رقم الجوال موجود مسبقًا للعميل {name}."))
   }
  }
  Ok(())
@@ -877,7 +877,7 @@ fn ensure_customer_phone_available(conn:&Connection,phone:&str,except_id:Option<
 
 #[cfg(test)]
 mod customer_phone_tests{
- use super::{ensure_customer_phone_available,normalized_customer_phone};
+ use super::{ensure_customer_phone_available,find_customer_by_phone_from_connection,normalized_customer_phone};
  use rusqlite::Connection;
 
  #[test]
@@ -895,6 +895,20 @@ mod customer_phone_tests{
   assert!(ensure_customer_phone_available(&conn,"0501234567",Some(2)).is_err());
   assert!(ensure_customer_phone_available(&conn,"0501234567",Some(1)).is_ok());
   assert!(ensure_customer_phone_available(&conn,"0550000000",None).is_ok());
+ }
+
+ #[test]
+ fn duplicate_phone_lookup_returns_the_existing_record_and_measurement_history_count(){
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE customers(id INTEGER PRIMARY KEY,customer_code TEXT,name TEXT,phone TEXT);
+   CREATE TABLE invoices(id INTEGER PRIMARY KEY,customer_id INTEGER,created_at TEXT,total_price TEXT,paid_amount TEXT,discount TEXT);
+   INSERT INTO customers VALUES(1,'101','علي','0501234567');
+   INSERT INTO invoices VALUES(1,1,'2026-09-30','100','40','0');").unwrap();
+  let found=find_customer_by_phone_from_connection(&conn,"+966 50 123 4567").unwrap().unwrap();
+  assert_eq!(found.id,1);
+  assert_eq!(found.invoice_count,1);
+  assert_eq!(found.outstanding,60.0);
+  assert!(find_customer_by_phone_from_connection(&conn,"0550000000").unwrap().is_none());
  }
 }
 
@@ -1040,6 +1054,35 @@ fn search_customers(app:AppHandle,query:String)->Result<Vec<CustomerSearchItem>,
   invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,outstanding:row.get(6)?,
  })).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn find_customer_by_phone(app:AppHandle,phone:String)->Result<Option<CustomerSearchItem>,String>{
+ let conn=db(&app)?;
+ find_customer_by_phone_from_connection(&conn,&phone)
+}
+
+fn find_customer_by_phone_from_connection(conn:&Connection,phone:&str)->Result<Option<CustomerSearchItem>,String>{
+ let normalized=normalized_customer_phone(phone);
+ if normalized.is_empty(){return Ok(None)}
+ let mut statement=conn.prepare("SELECT id,phone FROM customers").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok((row.get::<_,i64>(0)?,row.get::<_,String>(1)?))).map_err(|e|e.to_string())?;
+ let mut customer_id=None;
+ for row in rows{
+  let (id,stored_phone)=row.map_err(|e|e.to_string())?;
+  if normalized_customer_phone(&stored_phone)==normalized{customer_id=Some(id);break}
+ }
+ drop(statement);
+ let Some(customer_id)=customer_id else{return Ok(None)};
+ conn.query_row(&format!(
+  "SELECT c.id,c.customer_code,c.name,c.phone,COUNT(i.id),COALESCE(MAX(i.created_at),''),
+          COALESCE(SUM({INVOICE_REMAINING_EXPRESSION}),0)
+   FROM customers c LEFT JOIN invoices i ON i.customer_id=c.id WHERE c.id=?1
+   GROUP BY c.id,c.customer_code,c.name,c.phone"
+ ),params![customer_id],|row|Ok(CustomerSearchItem{
+  id:row.get(0)?,code:row.get(1)?,name:row.get(2)?,phone:row.get(3)?,
+  invoice_count:row.get(4)?,last_invoice_at:row.get(5)?,outstanding:row.get(6)?,
+ })).map(Some).map_err(|e|e.to_string())
 }
 
 #[tauri::command]
@@ -2389,7 +2432,7 @@ mod accounting_dashboard_report_tests{
 }
 
 fn main(){
- let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{
