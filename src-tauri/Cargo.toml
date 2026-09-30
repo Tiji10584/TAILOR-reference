@@ -1,6 +1,6 @@
 [package]
 name="tailor-workspace"
-version="0.3.1"
+version="0.3.2"
 edition="2021"
 [build-dependencies]
 tauri-build={version="2",features=[]}

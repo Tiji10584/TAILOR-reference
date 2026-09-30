@@ -226,6 +226,10 @@ struct FabricUsagePayload{fabric_id:i64,thobe_index:i64,meters:f64}
 #[serde(rename_all="camelCase")]
 struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<String>,thobe_size:String,amount:f64,#[serde(default)] tailor_amount:Option<f64>}
 
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+struct PaymentSplit{method:String,amount:f64}
+
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct WorkerLedgerEntry{
@@ -258,13 +262,14 @@ struct WorkerAccount{worker:WorkerProfile,movements:Vec<WorkerMovement>,salary_c
 struct InvoicePayload{
  id:Option<i64>,customer_id:i64,weight:String,delivery_date:String,day_count:i64,total_thobes:i64,
  total_price:String,paid_amount:String,payment_method:String,discount:String,notes:String,
+ #[serde(default)] payment_splits:Option<Vec<PaymentSplit>>,
  measurements_json:String,fabric_json:String,designs_json:String,details_json:String,
  fabric_usages:Vec<FabricUsagePayload>,worker_cuts:Vec<WorkerCutPayload>,confirm_low_stock:bool
 }
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct InvoiceRecord{id:i64,invoice_number:String,created_at:String}
+struct InvoiceRecord{id:i64,invoice_number:String,created_at:String,payment_method:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -1388,6 +1393,64 @@ fn save_whatsapp_campaign(app:AppHandle,title:String,message:String,recipient_co
 
 fn parse_money(value:&str)->f64{value.trim().parse::<f64>().unwrap_or(0.0)}
 
+fn money_cents(amount:f64)->Result<i64,String>{
+ if !amount.is_finite()||amount<0.0||amount>10_000_000.0||(amount*100.0-(amount*100.0).round()).abs()>0.0001{
+  return Err("اكتب مبلغًا صالحًا لا يتجاوز منزلتين عشريتين".into())
+ }
+ Ok((amount*100.0).round() as i64)
+}
+
+fn payment_parts(total:f64,method:&str,splits:Option<&[PaymentSplit]>)->Result<Vec<(String,f64)>,String>{
+ let total_cents=money_cents(total)?;
+ let Some(splits)=splits else{return Ok(if total_cents>0{vec![(method.to_string(),total)]}else{Vec::new()})};
+ if splits.is_empty()||splits.len()>3{return Err("حدد مبالغ الدفع النقدي والشبكة والتحويل".into())}
+ let mut seen=std::collections::HashSet::new();
+ let mut parts=Vec::new();let mut sum=0i64;
+ for part in splits{
+  if !matches!(part.method.as_str(),"كاش"|"شبكة"|"تحويل")||!seen.insert(part.method.as_str()){
+   return Err("طريقة الدفع المقسّم غير صحيحة".into())
+  }
+  let cents=money_cents(part.amount)?;
+  if cents==0{return Err("يجب أن يكون مبلغ كل طريقة دفع أكبر من صفر".into())}
+  sum+=cents;
+  parts.push((part.method.clone(),cents as f64/100.0));
+ }
+ if sum!=total_cents{return Err("مجموع طرق الدفع لا يساوي المبلغ المدفوع".into())}
+ Ok(parts)
+}
+
+#[cfg(test)]
+mod payment_split_tests{
+ use super::{invoice_payment_summary,payment_parts,PaymentSplit};
+ use rusqlite::{params,Connection};
+
+ #[test]
+ fn split_payment_balances_and_rejects_mismatches(){
+  let parts=[PaymentSplit{method:"كاش".into(),amount:50.0},PaymentSplit{method:"شبكة".into(),amount:50.0}];
+  assert_eq!(payment_parts(100.0,"متعدد",Some(&parts)).unwrap(),vec![("كاش".to_string(),50.0),("شبكة".to_string(),50.0)]);
+  assert!(payment_parts(99.0,"متعدد",Some(&parts)).is_err());
+  assert!(payment_parts(100.0,"متعدد",Some(&[PaymentSplit{method:"كاش".into(),amount:50.0},PaymentSplit{method:"كاش".into(),amount:50.0}])).is_err());
+ }
+
+ #[test]
+ fn financial_entries_keep_the_method_totals_separate(){
+  let mut conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE financial_entries(invoice_id INTEGER,entry_type TEXT,payment_method TEXT,amount REAL);").unwrap();
+  let transaction=conn.transaction().unwrap();
+  for (method,amount) in [("كاش",50.0),("شبكة",50.0)]{
+   transaction.execute("INSERT INTO financial_entries(invoice_id,entry_type,payment_method,amount) VALUES(1,'دفعة فاتورة',?1,?2)",params![method,amount]).unwrap();
+  }
+  assert_eq!(invoice_payment_summary(&transaction,1).unwrap().unwrap(),"متعدد (كاش 50.00 + شبكة 50.00)");
+ }
+}
+
+fn invoice_payment_summary(transaction:&rusqlite::Transaction<'_>,invoice_id:i64)->Result<Option<String>,String>{
+ let mut statement=transaction.prepare("SELECT payment_method,SUM(amount) FROM financial_entries WHERE invoice_id=?1 AND entry_type='دفعة فاتورة' GROUP BY payment_method HAVING SUM(amount)>0.004 ORDER BY CASE payment_method WHEN 'كاش' THEN 0 WHEN 'شبكة' THEN 1 WHEN 'تحويل' THEN 2 ELSE 3 END,payment_method").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([invoice_id],|row|Ok((row.get::<_,String>(0)?,row.get::<_,f64>(1)?))).map_err(|e|e.to_string())?;
+ let parts=rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+ Ok(match parts.len(){0=>None,1=>Some(parts[0].0.clone()),_=>Some(format!("متعدد ({})",parts.iter().map(|(method,amount)|format!("{method} {amount:.2}")).collect::<Vec<_>>().join(" + ")))})
+}
+
 const INVOICE_REMAINING_EXPRESSION:&str="MAX(0,COALESCE(CAST(NULLIF(i.total_price,'') AS REAL),0)-COALESCE(CAST(NULLIF(i.paid_amount,'') AS REAL),0)-COALESCE(CAST(NULLIF(i.discount,'') AS REAL),0))";
 
 fn total_customer_debt(conn:&Connection)->Result<f64,String>{
@@ -1439,8 +1502,9 @@ fn add_financial_entry(app:AppHandle,entry_type:String,description:String,amount
 }
 
 #[tauri::command]
-fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method:String)->Result<(),String>{
+fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method:String,payment_splits:Option<Vec<PaymentSplit>>)->Result<(),String>{
  if !amount.is_finite()||amount<=0.0{return Err("أدخل مبلغ الدفعة".into())}
+ let parts=payment_parts(amount,&payment_method,payment_splits.as_deref())?;
  let mut conn=db(&app)?;
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
  let (invoice_number,customer_name,total_text,paid_text,discount_text):(String,String,String,String,String)=transaction.query_row(
@@ -1451,7 +1515,12 @@ fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method
  if amount>remaining+0.0001{return Err(format!("المتبقي على الفاتورة {:.2} ريال فقط",remaining))}
  let new_paid=paid+amount;
  transaction.execute("UPDATE invoices SET paid_amount=?1,updated_at=datetime('now','localtime') WHERE id=?2",params![format!("{:.2}",new_paid),invoice_id]).map_err(|e|e.to_string())?;
- transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![invoice_id,format!("فاتورة {} — {}",invoice_number,customer_name),amount,payment_method]).map_err(|e|e.to_string())?;
+ for (method,part_amount) in parts{
+  transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![invoice_id,format!("فاتورة {} — {}",invoice_number,customer_name),part_amount,method]).map_err(|e|e.to_string())?;
+ }
+ if let Some(summary)=invoice_payment_summary(&transaction,invoice_id)?{
+  transaction.execute("UPDATE invoices SET payment_method=?1 WHERE id=?2",params![summary,invoice_id]).map_err(|e|e.to_string())?;
+ }
  transaction.commit().map_err(|e|e.to_string())
 }
 
@@ -2166,8 +2235,10 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  let mut conn=db(&app)?;
  if let Some(id)=payload.id{
   let transaction=conn.transaction().map_err(|e|e.to_string())?;
-  let old_paid_text:String=transaction.query_row("SELECT paid_amount FROM invoices WHERE id=?1 AND customer_id=?2",params![id,payload.customer_id],|row|row.get(0)).map_err(|_|"الفاتورة غير موجودة".to_string())?;
+ let old_paid_text:String=transaction.query_row("SELECT paid_amount FROM invoices WHERE id=?1 AND customer_id=?2",params![id,payload.customer_id],|row|row.get(0)).map_err(|_|"الفاتورة غير موجودة".to_string())?;
   let payment_delta=parse_money(&payload.paid_amount)-parse_money(&old_paid_text);
+  if payload.payment_splits.is_some()&&payment_delta<=0.0{return Err("قسّم الدفعة الإضافية فقط، أو سجّلها من قسم المالية".into())}
+  let split_parts=if payment_delta>0.0{payment_parts(payment_delta,&payload.payment_method,payload.payment_splits.as_deref())?}else{Vec::new()};
   transaction.execute(
    "UPDATE invoices SET weight=?1,delivery_date=?2,day_count=?3,total_thobes=?4,total_price=?5,paid_amount=?6,payment_method=?7,discount=?8,notes=?9,measurements_json=?10,fabric_json=?11,designs_json=?12,details_json=?13,updated_at=datetime('now','localtime') WHERE id=?14 AND customer_id=?15",
    params![&payload.weight,&payload.delivery_date,payload.day_count,payload.total_thobes,&payload.total_price,&payload.paid_amount,&payload.payment_method,&payload.discount,&payload.notes,&payload.measurements_json,&payload.fabric_json,&payload.designs_json,&payload.details_json,id,payload.customer_id]
@@ -2177,14 +2248,20 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
    params![id,payload.customer_id],
    |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))
   ).map_err(|e|e.to_string())?;
-  if payment_delta.abs()>0.0001{
+  if payment_delta>0.0001{
+   for (method,amount) in split_parts{
+    transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("تعديل دفعة الفاتورة {}",invoice_number),amount,method]).map_err(|e|e.to_string())?;
+   }
+  }else if payment_delta < -0.0001{
    transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("تعديل دفعة الفاتورة {}",invoice_number),payment_delta,&payload.payment_method]).map_err(|e|e.to_string())?;
   }
+  let effective_method=invoice_payment_summary(&transaction,id)?.unwrap_or_else(||payload.payment_method.clone());
+  transaction.execute("UPDATE invoices SET payment_method=?1 WHERE id=?2",params![&effective_method,id]).map_err(|e|e.to_string())?;
   transaction.execute("UPDATE orders SET quantity=?1,delivery_date=NULLIF(?2,'') WHERE id=?3",params![payload.total_thobes,&payload.delivery_date,order_id]).map_err(|e|e.to_string())?;
   apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
   apply_invoice_worker_cuts(&transaction,id,&payload.worker_cuts)?;
   transaction.commit().map_err(|e|e.to_string())?;
-  return Ok(InvoiceRecord{id,invoice_number,created_at})
+  return Ok(InvoiceRecord{id,invoice_number,created_at,payment_method:effective_method})
  }
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
  transaction.execute(
@@ -2200,14 +2277,17 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  let invoice_number=id.to_string();
  transaction.execute("UPDATE invoices SET invoice_number=?1 WHERE id=?2",params![&invoice_number,id]).map_err(|e|e.to_string())?;
  let initial_payment=parse_money(&payload.paid_amount);
- if initial_payment>0.0{
-  transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("دفعة أولية للفاتورة {}",invoice_number),initial_payment,&payload.payment_method]).map_err(|e|e.to_string())?;
+ let initial_parts=payment_parts(initial_payment,&payload.payment_method,payload.payment_splits.as_deref())?;
+ for (method,amount) in initial_parts{
+  transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![id,format!("دفعة أولية للفاتورة {}",invoice_number),amount,method]).map_err(|e|e.to_string())?;
  }
+ let effective_method=invoice_payment_summary(&transaction,id)?.unwrap_or_else(||payload.payment_method.clone());
+ transaction.execute("UPDATE invoices SET payment_method=?1 WHERE id=?2",params![&effective_method,id]).map_err(|e|e.to_string())?;
  apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
  apply_invoice_worker_cuts(&transaction,id,&payload.worker_cuts)?;
  let created_at:String=transaction.query_row("SELECT created_at FROM invoices WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
- Ok(InvoiceRecord{id,invoice_number,created_at})
+ Ok(InvoiceRecord{id,invoice_number,created_at,payment_method:effective_method})
 }
 
 #[cfg(test)]
