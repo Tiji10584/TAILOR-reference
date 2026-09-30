@@ -8,7 +8,7 @@ Version 0.3.0 separates white and colored fabric in stock and tailoring, records
 
 New thobes start with yards as their input unit; previously saved thobes keep the unit used when saved. Inventory deduction remains in meters. When the required fabric exceeds available stock, the operator must explicitly acknowledge that the full deduction may result in a negative balance before saving or printing. Missing tailor selections are shown in a centered warning.
 
-Give customers **only the NSIS setup file**. Do not copy the full `H:\TAILOR` development folder or its debug builds to a customer device.
+Give customers **only the NSIS setup file**. Do not copy the full `G:\TAILOR-0.3.2` development folder or its debug builds to a customer device.
 
 ## Issue a license on the owner's computer
 
