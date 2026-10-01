@@ -5124,5 +5124,9 @@ body[data-print-target="finance"] .print-area .financial-entry-sheet{display:blo
 .settings-auto-report .settings-printer-fields label{min-width:170px;flex:1}
 .settings-auto-report input:not([type=checkbox]){height:42px;padding:6px 10px;border:1px solid var(--line-strong);border-radius:8px;color:var(--text);background:var(--surface)}
 .settings-auto-report input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent)}
+.settings-license-card{grid-column:1/-1!important;display:grid;gap:12px}
+.settings-license-card>label{display:grid;gap:7px;max-width:380px;color:var(--text);font-size:.8rem;font-weight:700}
+.settings-license-card input{height:42px;padding:6px 10px;border:1px solid var(--line-strong);border-radius:8px;color:var(--text);background:var(--surface)}
+.settings-license-card>.settings-primary{justify-self:start}
 .auto-report-warning{position:relative;z-index:20;max-width:900px;margin:6px auto;padding:8px 14px;border:1px solid var(--line-strong);border-radius:8px;color:var(--text);background:var(--surface);text-align:center}
 @media print{html[data-print-target] .auto-report-warning{display:none!important}}

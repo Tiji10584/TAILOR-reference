@@ -5,7 +5,7 @@ use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
 mod license;
-use license::{activate_license,license_status};
+use license::{activate_license,deactivate_license,license_status};
 
 #[cfg(windows)]
 #[tauri::command]
@@ -633,6 +633,7 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"orders","delivered_at")?{
   conn.execute("ALTER TABLE orders ADD COLUMN delivered_at TEXT",[]).map_err(|e|e.to_string())?;
  }
+ conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_status_delivered_at ON orders(work_status,delivered_at)",[]).map_err(|e|e.to_string())?;
  if !has_column(&conn,"fabric_movements","entry_unit")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN entry_unit TEXT NOT NULL DEFAULT 'متر'",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"fabric_movements","carton_count")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN carton_count REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"fabric_movements","meters_per_carton")?{conn.execute("ALTER TABLE fabric_movements ADD COLUMN meters_per_carton REAL NOT NULL DEFAULT 0",[]).map_err(|e|e.to_string())?;}
@@ -809,6 +810,9 @@ fn work_board(app:AppHandle)->Result<Vec<WorkBoardItem>,String>{
    FROM orders o
    JOIN invoices i ON i.order_id=o.id
    JOIN customers c ON c.id=i.customer_id
+   WHERE o.work_status<>'تم التسليم'
+      OR (o.delivered_at>=datetime('now','localtime','start of day')
+          AND o.delivered_at<datetime('now','localtime','start of day','+1 day'))
    ORDER BY o.id DESC"
  ).map_err(|e|e.to_string())?;
  let rows=statement.query_map([],|row|Ok(WorkBoardItem{
@@ -2544,7 +2548,7 @@ mod accounting_dashboard_report_tests{
 }
 
 fn main(){
- let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,report_printer_ready,save_auto_report_settings,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,deactivate_license,print_direct,list_printers,report_printer_ready,save_auto_report_settings,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{

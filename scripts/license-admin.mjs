@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Keep the private key and this issuing tool on the owner's computer, never in a customer package.
-import { generateKeyPairSync, createPrivateKey, sign } from 'node:crypto';
+import { generateKeyPairSync, createPrivateKey, sign, randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
@@ -47,8 +47,9 @@ try {
     }
     const privateKey = createPrivateKey(readFileSync(resolve(privatePath)));
     if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error('The private key must be Ed25519.');
-    const signature = sign(null, Buffer.from(`TAILOR-LICENSE-v2:${deviceCode}:${expiresAt ?? 'permanent'}`, 'utf8'), privateKey).toString('base64');
-    const license = { version: 2, deviceCode, expiresAt, signature };
+    const licenseId = randomBytes(16).toString('hex');
+    const signature = sign(null, Buffer.from(`TAILOR-LICENSE-v3:${deviceCode}:${expiresAt ?? 'permanent'}:${licenseId}`, 'utf8'), privateKey).toString('base64');
+    const license = { version: 3, deviceCode, expiresAt, licenseId, signature };
     mkdirSync(dirname(resolve(outputPath)), { recursive: true });
     writeFileSync(resolve(outputPath), JSON.stringify(license, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     console.log(`Created ${expiresAt === null ? 'permanent' : `timed until ${new Date(expiresAt).toISOString()}`} license for ${deviceCode} at ${resolve(outputPath)}.`);

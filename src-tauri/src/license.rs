@@ -29,6 +29,8 @@ struct LicenseDocument {
     device_code: String,
     #[serde(default)]
     expires_at: Option<u64>,
+    #[serde(default)]
+    license_id: Option<String>,
     signature: String,
 }
 
@@ -38,9 +40,12 @@ struct ActivationHistory {
     previously_activated: bool,
     trial_expired: bool,
     last_seen_ms: u64,
+    #[serde(default)]
+    revoked_signatures: Vec<String>,
 }
 
 const CLOCK_TOLERANCE_MS: u64 = 5 * 60 * 1000;
+const DEACTIVATION_CODE: &str = "ADMIN2";
 static LICENSE_LOCK: Mutex<()> = Mutex::new(());
 static TIME_ANCHOR: OnceLock<Mutex<Option<(u64, Instant)>>> = OnceLock::new();
 
@@ -79,6 +84,16 @@ fn verify_license_with_key(
                 .expires_at
                 .map_or_else(|| "permanent".into(), |expiry| expiry.to_string())
         ),
+        3 => {
+            let id = license.license_id.as_deref().ok_or("معرّف ملف التفعيل مفقود")?;
+            if id.len() != 32 || !id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
+                return Err("معرّف ملف التفعيل غير صالح".into());
+            }
+            format!(
+                "TAILOR-LICENSE-v3:{device_code}:{}:{id}",
+                license.expires_at.map_or_else(|| "permanent".into(), |expiry| expiry.to_string())
+            )
+        }
         _ => return Err("إصدار ملف التفعيل غير صالح".into()),
     };
     let bytes = STANDARD
@@ -304,11 +319,15 @@ fn stored_status(app: &AppHandle) -> Result<LicenseStatus, String> {
         Ok(document) => document,
         Err(_) => return Ok(status),
     };
+    if history.revoked_signatures.contains(&document.signature) {
+        return Ok(status);
+    }
     let now = observed_ms()?;
     let previous = ActivationHistory {
         previously_activated: history.previously_activated,
         trial_expired: history.trial_expired,
         last_seen_ms: history.last_seen_ms,
+        revoked_signatures: history.revoked_signatures.clone(),
     };
     let (active, expired, clock_warning) = evaluate_document(&document, &mut history, now);
     if previous.previously_activated != history.previously_activated
@@ -403,6 +422,9 @@ pub fn activate_license(
         validate_activation_choice(&document, &activation_mode, selected_expiry_at)?;
         let folder = license_folder(&app)?;
         let mut history = read_history(&folder)?;
+        if history.revoked_signatures.contains(&document.signature) {
+            return Err("أُلغي ملف التفعيل هذا سابقًا على هذا الجهاز. اطلب ملف تفعيل جديدًا.".into());
+        }
         let now = observed_ms()?;
         let (valid, expired, clock_warning) = evaluate_document(&document, &mut history, now);
         if expired {
@@ -435,6 +457,39 @@ pub fn activate_license(
             trial_expired: history.trial_expired,
             clock_warning: false,
         })
+    }
+}
+
+#[tauri::command]
+pub fn deactivate_license(
+    app: AppHandle,
+    state: tauri::State<'_, crate::SessionState>,
+    admin_code: String,
+) -> Result<LicenseStatus, String> {
+    #[cfg(debug_assertions)]
+    {
+        let _ = (app, state, admin_code);
+        return Err("إلغاء التفعيل متاح في النسخة المثبتة فقط".into());
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        if admin_code != DEACTIVATION_CODE {
+            return Err("رمز إلغاء التفعيل غير صحيح".into());
+        }
+        let guard = LICENSE_LOCK.lock().map_err(|_| "تعذر إلغاء التفعيل".to_string())?;
+        let folder = license_folder(&app)?;
+        let path = folder.join("license.json");
+        let text = fs::read_to_string(&path).map_err(|_| "لا يوجد ملف تفعيل لإلغائه".to_string())?;
+        let document = verify_license_with_key(&text, &device_code(&app)?, &key_bytes()?)?;
+        let mut history = read_history(&folder)?;
+        if !history.revoked_signatures.contains(&document.signature) {
+            history.revoked_signatures.push(document.signature);
+        }
+        history.previously_activated = true;
+        save_history(&folder, &history)?;
+        fs::remove_file(path).map_err(|e| format!("سُجل إلغاء التفعيل، لكن تعذر إزالة الملف: {e}"))?;
+        drop(guard);
+        license_status(app, state)
     }
 }
 
@@ -515,6 +570,7 @@ mod tests {
             previously_activated: true,
             trial_expired: true,
             last_seen_ms: 1_800_000_000_000,
+            revoked_signatures: vec![],
         };
         assert_eq!(
             evaluate_document(&verified, &mut history, 1_800_000_000_001),
@@ -529,12 +585,14 @@ mod tests {
             version: 2,
             device_code: "device".into(),
             expires_at: Some(1_900_000_000_000),
+            license_id: None,
             signature: "".into(),
         };
         let mut history = ActivationHistory {
             previously_activated: true,
             trial_expired: false,
             last_seen_ms: 1_800_000_000_000,
+            revoked_signatures: vec![],
         };
         assert_eq!(
             evaluate_document(
@@ -544,5 +602,40 @@ mod tests {
             ),
             (false, false, true)
         );
+    }
+
+    #[test]
+    fn old_activation_history_loads_without_revocations() {
+        let history: ActivationHistory = serde_json::from_str(
+            r#"{"previouslyActivated":true,"trialExpired":false,"lastSeenMs":1234}"#,
+        )
+        .unwrap();
+        assert!(history.previously_activated);
+        assert!(history.revoked_signatures.is_empty());
+        let mut history = history;
+        history.revoked_signatures.push("old-license".into());
+        let saved = serde_json::to_string(&history).unwrap();
+        let loaded: ActivationHistory = serde_json::from_str(&saved).unwrap();
+        assert!(loaded.revoked_signatures.contains(&"old-license".to_string()));
+        assert!(!loaded.revoked_signatures.contains(&"new-license".to_string()));
+    }
+
+    #[test]
+    fn new_permanent_license_can_replace_revoked_one() {
+        let signer = SigningKey::from_bytes(&[11u8; 32]);
+        let code = "42e3b5f7-804e-4aa0-bdcc-97b66dd2f38f";
+        let make = |id: &str| {
+            let payload = format!("TAILOR-LICENSE-v3:{code}:permanent:{id}");
+            let signature = signer.sign(payload.as_bytes());
+            serde_json::json!({"version":3,"deviceCode":code,"expiresAt":null,"licenseId":id,"signature":STANDARD.encode(signature.to_bytes())}).to_string()
+        };
+        let old = verify_license_with_key(&make("00000000000000000000000000000001"), code, signer.verifying_key().as_bytes()).unwrap();
+        let new = verify_license_with_key(&make("00000000000000000000000000000002"), code, signer.verifying_key().as_bytes()).unwrap();
+        assert_ne!(old.signature, new.signature);
+        let history = ActivationHistory { revoked_signatures: vec![old.signature.clone()], ..Default::default() };
+        assert!(history.revoked_signatures.contains(&old.signature));
+        assert!(!history.revoked_signatures.contains(&new.signature));
+        let tampered = make("00000000000000000000000000000002").replace("00000000000000000000000000000002", "00000000000000000000000000000003");
+        assert!(verify_license_with_key(&tampered, code, signer.verifying_key().as_bytes()).is_err());
     }
 }
