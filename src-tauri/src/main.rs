@@ -144,6 +144,16 @@ struct WorkBoardItem{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
+struct DeliveryInvoiceBalance{invoice_id:i64,invoice_number:String,remaining:f64}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct DeliveryContext{
+ order_id:i64,quantity:i64,customer_name:String,current:DeliveryInvoiceBalance,older:Vec<DeliveryInvoiceBalance>,total_debt:f64
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 struct CurrentSession{started_at:String}
 
 #[derive(Serialize)]
@@ -265,6 +275,10 @@ struct WorkerCutPayload{thobe_index:i64,worker_name:String,tailor_name:Option<St
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
 struct PaymentSplit{method:String,amount:f64}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+struct DeliveryPaymentAllocation{invoice_id:i64,payment_splits:Vec<PaymentSplit>}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -822,6 +836,22 @@ fn work_board(app:AppHandle)->Result<Vec<WorkBoardItem>,String>{
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
+fn delivery_context_from_connection(conn:&Connection,order_id:i64)->Result<DeliveryContext,String>{
+ let (customer_id,customer_name,invoice_id,invoice_number,remaining,quantity):(i64,String,i64,String,f64,i64)=conn.query_row(
+  &format!("SELECT i.customer_id,c.name,i.id,i.invoice_number,{INVOICE_REMAINING_EXPRESSION},o.quantity FROM orders o JOIN invoices i ON i.order_id=o.id JOIN customers c ON c.id=i.customer_id WHERE o.id=?1 AND o.work_status='في المحل بانتظار التسليم'"),
+  [order_id],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?))
+ ).map_err(|_|"الطلب غير موجود في مرحلة انتظار التسليم".to_string())?;
+ let mut statement=conn.prepare(&format!("SELECT i.id,i.invoice_number,{INVOICE_REMAINING_EXPRESSION} FROM invoices i WHERE i.customer_id=?1 AND i.id<>?2 AND {INVOICE_REMAINING_EXPRESSION}>0.0001 ORDER BY i.id DESC")).map_err(|e|e.to_string())?;
+ let older=statement.query_map(params![customer_id,invoice_id],|row|Ok(DeliveryInvoiceBalance{invoice_id:row.get(0)?,invoice_number:row.get(1)?,remaining:row.get(2)?})).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+ let total_debt=remaining+older.iter().map(|item:&DeliveryInvoiceBalance|item.remaining).sum::<f64>();
+ Ok(DeliveryContext{order_id,quantity,customer_name,current:DeliveryInvoiceBalance{invoice_id,invoice_number,remaining},older,total_debt})
+}
+
+#[tauri::command]
+fn delivery_payment_context(app:AppHandle,order_id:i64)->Result<DeliveryContext,String>{
+ delivery_context_from_connection(&db(&app)?,order_id)
+}
+
 fn update_order_stage(conn:&Connection,order_id:i64,status:&str)->Result<(),String>{
  conn.execute(
   "UPDATE orders SET work_status=?1,
@@ -840,7 +870,7 @@ fn advance_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
   "انتظار القص"=>"عند الخياط",
   "عند الخياط"=>"في المغسلة",
   "في المغسلة"=>"في المحل بانتظار التسليم",
-  "في المحل بانتظار التسليم"=>"تم التسليم",
+  "في المحل بانتظار التسليم"=>return Err("افتح شاشة التسليم وسجل الدفعة أو أكد التسليم دون دفع".into()),
   "تم التسليم"=>return Ok(()),
   _=>return Err("حالة الثوب غير معروفة".into()),
  };
@@ -866,6 +896,7 @@ fn retreat_order_status(app:AppHandle,order_id:i64)->Result<(),String>{
 fn move_orders_to_status(app:AppHandle,order_ids:Vec<i64>,status:String)->Result<(),String>{
  let allowed=["انتظار القص","عند الخياط","في المغسلة","في المحل بانتظار التسليم","تم التسليم"];
  if !allowed.contains(&status.as_str()){return Err("مرحلة العمل غير صحيحة".into())}
+ if status=="تم التسليم"{return Err("سلّم كل فاتورة من شاشة التسليم لتسجيل دفعاتها وديون العميل".into())}
  if order_ids.is_empty(){return Err("حدد ثوبًا واحدًا على الأقل".into())}
  let mut conn=db(&app)?;let transaction=conn.transaction().map_err(|e|e.to_string())?;
  for order_id in order_ids.iter(){update_order_stage(&transaction,*order_id,&status)?;}
@@ -1700,6 +1731,88 @@ fn record_invoice_payment(app:AppHandle,invoice_id:i64,amount:f64,payment_method
   transaction.execute("UPDATE invoices SET payment_method=?1 WHERE id=?2",params![summary,invoice_id]).map_err(|e|e.to_string())?;
  }
  transaction.commit().map_err(|e|e.to_string())
+}
+
+fn complete_delivery_from_connection(conn:&mut Connection,order_id:i64,allocations:Vec<DeliveryPaymentAllocation>)->Result<(),String>{
+ let transaction=conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|e|e.to_string())?;
+ let context=delivery_context_from_connection(&transaction,order_id)?;
+ let balances=std::iter::once(&context.current).chain(context.older.iter()).collect::<Vec<_>>();
+ let mut seen=std::collections::HashSet::new();
+ for allocation in allocations{
+  if !seen.insert(allocation.invoice_id){return Err("لا تكرر الفاتورة في دفعة التسليم".into())}
+  let balance=balances.iter().find(|item|item.invoice_id==allocation.invoice_id).ok_or("الفاتورة غير مرتبطة بهذا العميل أو ليست عليها ديون")?;
+  let amount:f64=allocation.payment_splits.iter().map(|part|part.amount).sum();
+  let cents=money_cents(amount)?;
+  if cents==0{return Err("اكتب مبلغ الدفعة أو اترك الفاتورة دون دفع".into())}
+  if cents>money_cents(balance.remaining)?{return Err(format!("المتبقي على الفاتورة {} {:.2} ريال فقط",balance.invoice_number,balance.remaining))}
+  let parts=payment_parts(amount,"متعدد",Some(&allocation.payment_splits))?;
+  let paid_text:String=transaction.query_row("SELECT paid_amount FROM invoices WHERE id=?1",[allocation.invoice_id],|row|row.get(0)).map_err(|e|e.to_string())?;
+  transaction.execute("UPDATE invoices SET paid_amount=?1,updated_at=datetime('now','localtime') WHERE id=?2",params![format!("{:.2}",parse_money(&paid_text)+amount),allocation.invoice_id]).map_err(|e|e.to_string())?;
+  for (method,part_amount) in parts{
+   transaction.execute("INSERT INTO financial_entries(entry_type,invoice_id,description,amount,payment_method,created_at) VALUES('دفعة فاتورة',?1,?2,?3,?4,datetime('now','localtime'))",params![allocation.invoice_id,format!("دفعة التسليم — فاتورة {} — {}",balance.invoice_number,context.customer_name),part_amount,method]).map_err(|e|e.to_string())?;
+  }
+  if let Some(summary)=invoice_payment_summary(&transaction,allocation.invoice_id)?{
+   transaction.execute("UPDATE invoices SET payment_method=?1 WHERE id=?2",params![summary,allocation.invoice_id]).map_err(|e|e.to_string())?;
+  }
+ }
+ update_order_stage(&transaction,order_id,"تم التسليم")?;
+ transaction.commit().map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+fn complete_delivery(app:AppHandle,order_id:i64,allocations:Vec<DeliveryPaymentAllocation>)->Result<(),String>{
+ complete_delivery_from_connection(&mut db(&app)?,order_id,allocations)
+}
+
+#[cfg(test)]
+mod delivery_payment_tests{
+ use super::{complete_delivery_from_connection,delivery_context_from_connection,DeliveryPaymentAllocation,PaymentSplit};
+ use rusqlite::Connection;
+
+ fn sample()->Connection{
+  let conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE customers(id INTEGER PRIMARY KEY,name TEXT);CREATE TABLE orders(id INTEGER PRIMARY KEY,work_status TEXT,tailored_date TEXT,delivered_at TEXT,quantity INTEGER);CREATE TABLE invoices(id INTEGER PRIMARY KEY,order_id INTEGER,customer_id INTEGER,invoice_number TEXT,total_price TEXT,paid_amount TEXT,discount TEXT,updated_at TEXT,payment_method TEXT);CREATE TABLE financial_entries(entry_type TEXT,invoice_id INTEGER,description TEXT,amount REAL,payment_method TEXT,created_at TEXT);INSERT INTO customers VALUES(1,'عميل');INSERT INTO orders VALUES(1,'في المحل بانتظار التسليم',NULL,NULL,1),(2,'تم التسليم',NULL,'2026-09-01',1);INSERT INTO invoices VALUES(1,1,1,'101','140','40','0',NULL,'كاش'),(2,2,1,'90','300','0','0',NULL,'كاش');").unwrap();
+  conn
+ }
+
+ #[test]
+ fn split_current_and_old_debt_are_saved_with_delivery(){
+  let mut conn=sample();
+  let before=delivery_context_from_connection(&conn,1).unwrap();
+  assert_eq!(before.current.remaining,100.0);
+  assert_eq!(before.older[0].remaining,300.0);
+  assert_eq!(before.total_debt,400.0);
+  complete_delivery_from_connection(&mut conn,1,vec![
+   DeliveryPaymentAllocation{invoice_id:1,payment_splits:vec![PaymentSplit{method:"كاش".into(),amount:50.0},PaymentSplit{method:"شبكة".into(),amount:50.0}]},
+   DeliveryPaymentAllocation{invoice_id:2,payment_splits:vec![PaymentSplit{method:"شبكة".into(),amount:300.0}]},
+  ]).unwrap();
+  assert_eq!(conn.query_row("SELECT work_status FROM orders WHERE id=1",[],|row|row.get::<_,String>(0)).unwrap(),"تم التسليم");
+  assert_eq!(conn.query_row("SELECT paid_amount FROM invoices WHERE id=1",[],|row|row.get::<_,String>(0)).unwrap(),"140.00");
+  assert_eq!(conn.query_row("SELECT paid_amount FROM invoices WHERE id=2",[],|row|row.get::<_,String>(0)).unwrap(),"300.00");
+  assert_eq!(conn.query_row("SELECT SUM(amount) FROM financial_entries",[],|row|row.get::<_,f64>(0)).unwrap(),400.0);
+ }
+
+ #[test]
+ fn invalid_old_debt_payment_rolls_back_current_payment_and_delivery(){
+  let mut conn=sample();
+  let result=complete_delivery_from_connection(&mut conn,1,vec![
+   DeliveryPaymentAllocation{invoice_id:1,payment_splits:vec![PaymentSplit{method:"كاش".into(),amount:100.0}]},
+   DeliveryPaymentAllocation{invoice_id:2,payment_splits:vec![PaymentSplit{method:"شبكة".into(),amount:301.0}]},
+  ]);
+  assert!(result.is_err());
+  assert_eq!(conn.query_row("SELECT work_status FROM orders WHERE id=1",[],|row|row.get::<_,String>(0)).unwrap(),"في المحل بانتظار التسليم");
+  assert_eq!(conn.query_row("SELECT paid_amount FROM invoices WHERE id=1",[],|row|row.get::<_,String>(0)).unwrap(),"40");
+  assert_eq!(conn.query_row("SELECT COUNT(*) FROM financial_entries",[],|row|row.get::<_,i64>(0)).unwrap(),0);
+ }
+
+ #[test]
+ fn delivery_without_payment_preserves_debt(){
+  let mut conn=sample();
+  complete_delivery_from_connection(&mut conn,1,vec![]).unwrap();
+  assert_eq!(conn.query_row("SELECT work_status FROM orders WHERE id=1",[],|row|row.get::<_,String>(0)).unwrap(),"تم التسليم");
+  assert_eq!(conn.query_row("SELECT paid_amount FROM invoices WHERE id=1",[],|row|row.get::<_,String>(0)).unwrap(),"40");
+  assert_eq!(conn.query_row("SELECT COUNT(*) FROM financial_entries",[],|row|row.get::<_,i64>(0)).unwrap(),0);
+ }
 }
 
 #[tauri::command]
@@ -2548,7 +2661,7 @@ mod accounting_dashboard_report_tests{
 }
 
 fn main(){
- let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,deactivate_license,print_direct,list_printers,report_printer_ready,save_auto_report_settings,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,deactivate_license,print_direct,list_printers,report_printer_ready,save_auto_report_settings,dashboard_summary,work_board,delivery_payment_context,complete_delivery,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{
