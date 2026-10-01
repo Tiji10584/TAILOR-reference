@@ -1,6 +1,6 @@
-# TAILOR 0.3.7: distribution and offline activation
+# TAILOR 0.3.8: distribution and offline activation
 
-Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.3.7_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
+Build and publish installers on the owner's Windows computer with `node scripts/build-installer.mjs --publish`; see [RELEASING.md](RELEASING.md) for the local workflow, tests, version checks, and the no-GitHub-CLI option. GitHub Actions can also publish to **Releases** automatically after account billing is restored. The local NSIS setup appears in `src-tauri/target/release/bundle/nsis/` as `TAILOR_0.3.8_x64-setup.exe` for this version. The installer includes the WebView2 offline installer, so recipients do not need development tools or internet to install.
 
 Version 0.2.9 counts invoice debt when the paid amount or discount is empty. The dashboard refreshes when opened, on focus, and while visible; direct moves to a completed stage record the tailoring date. Financial reports accept inclusive custom **from** and **to** dates, with daily, monthly, and yearly shortcuts. The report preview and printed sheet show both dates.
 
@@ -8,7 +8,7 @@ Version 0.3.0 separates white and colored fabric in stock and tailoring, records
 
 New thobes start with yards as their input unit; previously saved thobes keep the unit used when saved. Inventory deduction remains in meters. When the required fabric exceeds available stock, the operator must explicitly acknowledge that the full deduction may result in a negative balance before saving or printing. Missing tailor selections are shown in a centered warning.
 
-Give customers **only the NSIS setup file**. Do not copy the full `G:\TAILOR-0.3.7` development folder or its debug builds to a customer device.
+Give customers **only the NSIS setup file**. Do not copy the full `G:\TAILOR-0.3.8` development folder or its debug builds to a customer device.
 
 ## Issue a license on the owner's computer
 
@@ -37,3 +37,5 @@ Version 0.3.5 adds a saved minimum invoice price, transactional customer creatio
 Version 0.3.6 keeps the small price control unlabeled in the tailoring form and shows a prominent audible warning on a rejected low price. Choosing a fabric group without its color now produces a specific warning. The dashboard loads delivered orders from the current local day only; older records remain in customer history and financial reports. Settings can deactivate a signed license using the owner code. The exact revoked license is rejected again on that Windows user profile; a newly issued signed license can be used. New licenses use a unique signed issuance ID (version 3), so a fresh permanent license for the same device can work after cancellation; older version 1 and 2 files still verify. Deactivation keeps customer data and the device identity. The common code is embedded in the installed program and visible in the repository, so it is an operational control, not a secret against someone able to inspect or modify the program.
 
 Version 0.3.7 keeps the dashboard reachable when its warning banner or a short screen adds vertical content. Moving a ready order to delivered now opens an invoice-specific payment dialog before changing status. It shows the current order invoice debt and the customer total, accepts cash/network/transfer amounts per invoice for current and older debts, and commits all payments with the delivery status in one transaction. It can also deliver without a payment while preserving debt. Bulk transfer to delivered is disabled to enforce this accounting step. When one invoice contains multiple garments, its debt is tracked for the invoice as a whole.
+
+Version 0.3.8 includes 27 supplied garment design images in the installer. They are inserted once into existing databases with stable IDs, cannot be deleted in the UI, and are available in measurements, ready stock, and measurement printouts. The jabzour placket has its own selector. Existing customer and invoice records remain intact.

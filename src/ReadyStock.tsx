@@ -15,7 +15,7 @@ export const readyMeasurementFields=[
   "سعة اليد من تحت","الخبنة","طول الكبك","عرض الكبك","محيط الرقبة",
   "مقاس القلاب الأول","مقاس القلاب الثاني","مقاس الرقبة السادة"
 ] as const;
-const designCategories=["نوع الثوب","اليد السادة","الكبك","القلاب","الرقبة السادة","الجيب","السحب","الجنب وأسفل الثوب","التطريز","الأزرار","الجنزور والتخليص"];
+const designCategories=["نوع الثوب","اليد السادة","الكبك","القلاب","الرقبة السادة","جبزور","الجيب","السحب","الجنب وأسفل الثوب","التطريز","الأزرار","الجنزور والتخليص"];
 const numberFormat=new Intl.NumberFormat("ar-SA",{maximumFractionDigits:2});
 const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/,/g,".");
 const parseMeasure=(value:string)=>Number(normalizeDigits(value));

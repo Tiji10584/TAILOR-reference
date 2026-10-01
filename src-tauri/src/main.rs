@@ -5,6 +5,7 @@ use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::Mutex};
 use tauri::{AppHandle,Manager,WindowEvent};
 mod license;
+mod design_defaults;
 use license::{activate_license,deactivate_license,license_status};
 
 #[cfg(windows)]
@@ -171,7 +172,7 @@ struct CustomerSearchItem{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct DesignOption{id:i64,category:String,name:String,image_data:String}
+struct DesignOption{id:i64,category:String,name:String,image_data:String,is_builtin:bool}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -432,7 +433,8 @@ fn db(app:&AppHandle)->Result<Connection,String>{
    category TEXT NOT NULL,
    name TEXT NOT NULL,
    image_data TEXT NOT NULL,
-   created_at TEXT NOT NULL
+   created_at TEXT NOT NULL,
+   builtin_key TEXT
   );
   CREATE TABLE IF NOT EXISTS suppliers(
    id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -670,6 +672,9 @@ fn db(app:&AppHandle)->Result<Connection,String>{
  if !has_column(&conn,"workers","salary_start")?{conn.execute("ALTER TABLE workers ADD COLUMN salary_start TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"workers","active")?{conn.execute("ALTER TABLE workers ADD COLUMN active INTEGER NOT NULL DEFAULT 1",[]).map_err(|e|e.to_string())?;}
  if !has_column(&conn,"workers","archived_at")?{conn.execute("ALTER TABLE workers ADD COLUMN archived_at TEXT NOT NULL DEFAULT ''",[]).map_err(|e|e.to_string())?;}
+ if !has_column(&conn,"design_options","builtin_key")?{conn.execute("ALTER TABLE design_options ADD COLUMN builtin_key TEXT",[]).map_err(|e|e.to_string())?;}
+ conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_design_options_builtin_key ON design_options(builtin_key)",[]).map_err(|e|e.to_string())?;
+ design_defaults::seed_builtin_designs(&conn)?;
  conn.execute("UPDATE workers SET salary_start=substr(created_at,1,7)||'-01' WHERE salary_start=''",[]).map_err(|e|e.to_string())?;
  conn.execute_batch("
   UPDATE customers SET customer_code='__customer_' || id;
@@ -1220,8 +1225,8 @@ fn customer_invoices(app:AppHandle,customer_id:i64)->Result<Vec<SavedInvoice>,St
 #[tauri::command]
 fn list_design_options(app:AppHandle)->Result<Vec<DesignOption>,String>{
  let conn=db(&app)?;
- let mut statement=conn.prepare("SELECT id,category,name,image_data FROM design_options ORDER BY category,name,id").map_err(|e|e.to_string())?;
- let rows=statement.query_map([],|row|Ok(DesignOption{id:row.get(0)?,category:row.get(1)?,name:row.get(2)?,image_data:row.get(3)?})).map_err(|e|e.to_string())?;
+ let mut statement=conn.prepare("SELECT id,category,name,image_data,builtin_key FROM design_options ORDER BY category,name,id").map_err(|e|e.to_string())?;
+ let rows=statement.query_map([],|row|Ok(DesignOption{id:row.get(0)?,category:row.get(1)?,name:row.get(2)?,image_data:row.get(3)?,is_builtin:row.get::<_,Option<String>>(4)?.is_some()})).map_err(|e|e.to_string())?;
  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
 }
 
@@ -1242,6 +1247,8 @@ fn add_design_option(app:AppHandle,category:String,name:String,image_data:String
 #[tauri::command]
 fn delete_design_option(app:AppHandle,id:i64)->Result<(),String>{
  let conn=db(&app)?;
+ let builtin:Option<String>=conn.query_row("SELECT builtin_key FROM design_options WHERE id=?1",[id],|row|row.get(0)).optional().map_err(|e|e.to_string())?.flatten();
+ if builtin.is_some(){return Err("هذا شكل أساسي ضمن التطبيق ولا يمكن حذفه".into())}
  conn.execute("DELETE FROM design_options WHERE id=?1",[id]).map_err(|e|e.to_string())?;
  Ok(())
 }
