@@ -33,6 +33,42 @@ fn list_printers()->Result<Vec<String>,String>{
 #[tauri::command]
 fn list_printers()->Result<Vec<String>,String>{Ok(Vec::new())}
 
+// The spooler's status is the best available readiness signal; some drivers
+// report a disconnected USB printer as idle until a print job is submitted.
+#[cfg(windows)]
+#[tauri::command]
+fn report_printer_ready(printer_name:String)->Result<bool,String>{
+ use windows::{core::{PCWSTR,PWSTR},Win32::Graphics::Printing::{GetDefaultPrinterW,OpenPrinterW,GetPrinterW,ClosePrinter,PRINTER_HANDLE,PRINTER_INFO_2W,PRINTER_STATUS_OFFLINE,PRINTER_STATUS_NOT_AVAILABLE,PRINTER_STATUS_ERROR,PRINTER_STATUS_PAUSED,PRINTER_STATUS_PAPER_OUT,PRINTER_STATUS_PAPER_JAM,PRINTER_STATUS_NO_TONER,PRINTER_STATUS_DOOR_OPEN,PRINTER_ATTRIBUTE_WORK_OFFLINE}};
+ let name=if printer_name.trim().is_empty(){
+  let mut length=0u32;
+  unsafe{GetDefaultPrinterW(None,&mut length)};
+  if length==0{return Ok(false)}
+  let mut buffer=vec![0u16;length as usize];
+  if !unsafe{GetDefaultPrinterW(Some(PWSTR(buffer.as_mut_ptr())),&mut length)}.as_bool(){return Ok(false)}
+  String::from_utf16_lossy(&buffer[..buffer.iter().position(|unit|*unit==0).unwrap_or(buffer.len())])
+ }else{printer_name};
+ let wide:Vec<u16>=name.encode_utf16().chain(std::iter::once(0)).collect();
+ let mut printer=PRINTER_HANDLE::default();
+ if unsafe{OpenPrinterW(PCWSTR(wide.as_ptr()),&mut printer,None)}.is_err(){return Ok(false)}
+ let result=(||->Result<bool,String>{
+  let mut needed=0u32;
+  let _=unsafe{GetPrinterW(printer,2,None,&mut needed)};
+  if needed==0||needed>1024*1024{return Ok(false)}
+  let mut buffer=vec![0u8;needed as usize];
+  unsafe{GetPrinterW(printer,2,Some(&mut buffer),&mut needed)}.map_err(|e|e.to_string())?;
+  if buffer.len()<std::mem::size_of::<PRINTER_INFO_2W>(){return Ok(false)}
+  let info=unsafe{(buffer.as_ptr() as *const PRINTER_INFO_2W).read_unaligned()};
+  let blocked=PRINTER_STATUS_OFFLINE|PRINTER_STATUS_NOT_AVAILABLE|PRINTER_STATUS_ERROR|PRINTER_STATUS_PAUSED|PRINTER_STATUS_PAPER_OUT|PRINTER_STATUS_PAPER_JAM|PRINTER_STATUS_NO_TONER|PRINTER_STATUS_DOOR_OPEN;
+  Ok(info.Status&blocked==0&&info.Attributes&PRINTER_ATTRIBUTE_WORK_OFFLINE==0)
+ })();
+ let _=unsafe{ClosePrinter(printer)};
+ result
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn report_printer_ready(_printer_name:String)->Result<bool,String>{Ok(false)}
+
 // WebView2 prints the current page directly to the Windows default printer.
 // The frontend selects exactly one document with print CSS before invoking this command.
 #[cfg(windows)]
@@ -216,7 +252,7 @@ struct DailyReport{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct AppSettings{shop_name:String,owner_name:String,accountant_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String,initialized:bool,large_cut_price:f64,small_cut_price:f64}
+struct AppSettings{shop_name:String,owner_name:String,accountant_name:String,finance_pin_set:bool,app_pin_set:bool,theme:String,initialized:bool,large_cut_price:f64,small_cut_price:f64,auto_report_enabled:bool,auto_report_time:String,printer_check_minutes:i64}
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -262,6 +298,8 @@ struct WorkerAccount{worker:WorkerProfile,movements:Vec<WorkerMovement>,salary_c
 struct InvoicePayload{
  id:Option<i64>,customer_id:i64,weight:String,delivery_date:String,day_count:i64,total_thobes:i64,
  total_price:String,paid_amount:String,payment_method:String,discount:String,notes:String,
+ #[serde(default)] new_customer:Option<NewCustomerPayload>,
+ #[serde(default)] minimum_price:Option<f64>,
  #[serde(default)] payment_splits:Option<Vec<PaymentSplit>>,
  measurements_json:String,fabric_json:String,designs_json:String,details_json:String,
  fabric_usages:Vec<FabricUsagePayload>,worker_cuts:Vec<WorkerCutPayload>,confirm_low_stock:bool
@@ -269,7 +307,11 @@ struct InvoicePayload{
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct InvoiceRecord{id:i64,invoice_number:String,created_at:String,payment_method:String}
+struct InvoiceRecord{id:i64,customer_id:i64,invoice_number:String,created_at:String,payment_method:String}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+struct NewCustomerPayload{name:String,phone:String}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -950,16 +992,30 @@ fn update_customer(app:AppHandle,customer_id:i64,name:String,phone:String)->Resu
 
 #[tauri::command]
 fn delete_customer(app:AppHandle,customer_id:i64)->Result<(),String>{
- let conn=db(&app)?;
- let invoice_count:i64=conn.query_row("SELECT COUNT(*) FROM invoices WHERE customer_id=?1",[customer_id],|row|row.get(0)).map_err(|e|e.to_string())?;
- if invoice_count>0{return Err("لا يمكن حذف عميل لديه فواتير محفوظة. يمكنك تعديل بياناته بدلًا من الحذف.".into())}
- let deleted=conn.execute("DELETE FROM customers WHERE id=?1",[customer_id]).map_err(|e|e.to_string())?;
+ let mut conn=db(&app)?;
+ delete_customer_from_connection(&mut conn,customer_id)
+}
+
+fn delete_customer_from_connection(conn:&mut Connection,customer_id:i64)->Result<(),String>{
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let ids={
+  let mut statement=transaction.prepare("SELECT id FROM invoices WHERE customer_id=?1").map_err(|e|e.to_string())?;
+  let rows=statement.query_map([customer_id],|row|row.get::<_,i64>(0)).map_err(|e|e.to_string())?;
+  rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?
+ };
+ for invoice_id in ids{delete_invoice_in_transaction(&transaction,invoice_id,customer_id)?}
+ let deleted=transaction.execute("DELETE FROM customers WHERE id=?1",[customer_id]).map_err(|e|e.to_string())?;
  if deleted==0{return Err("العميل غير موجود".into())}
- Ok(())
+ transaction.commit().map_err(|e|e.to_string())
 }
 
 fn delete_invoice_from_connection(conn:&mut Connection,invoice_id:i64,customer_id:i64)->Result<(),String>{
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ delete_invoice_in_transaction(&transaction,invoice_id,customer_id)?;
+ transaction.commit().map_err(|e|e.to_string())
+}
+
+fn delete_invoice_in_transaction(transaction:&rusqlite::Transaction<'_>,invoice_id:i64,customer_id:i64)->Result<(),String>{
  let (order_id,number):(i64,String)=transaction.query_row(
   "SELECT order_id,invoice_number FROM invoices WHERE id=?1 AND customer_id=?2",
   params![invoice_id,customer_id],|row|Ok((row.get(0)?,row.get(1)?))
@@ -983,7 +1039,7 @@ fn delete_invoice_from_connection(conn:&mut Connection,invoice_id:i64,customer_i
  }
  transaction.execute("DELETE FROM invoices WHERE id=?1",[invoice_id]).map_err(|e|e.to_string())?;
  transaction.execute("DELETE FROM orders WHERE id=?1",[order_id]).map_err(|e|e.to_string())?;
- transaction.commit().map_err(|e|e.to_string())
+ Ok(())
 }
 
 #[tauri::command]
@@ -1018,6 +1074,28 @@ mod invoice_deletion_tests{
   assert_eq!(conn.query_row("SELECT stock_meters FROM fabrics WHERE id=7",[],|row|row.get::<_,f64>(0)).unwrap(),6.0);
   assert_eq!(conn.query_row("SELECT COUNT(*) FROM invoices WHERE id=2",[],|row|row.get::<_,i64>(0)).unwrap(),1);
   assert_eq!(conn.query_row("SELECT SUM(amount) FROM financial_entries",[],|row|row.get::<_,f64>(0)).unwrap(),60.0);
+ }
+ #[test]
+ fn deleting_customer_removes_all_linked_invoices_and_restores_fabric(){
+  let mut conn=Connection::open_in_memory().unwrap();
+  conn.execute_batch("CREATE TABLE customers(id INTEGER PRIMARY KEY);
+   CREATE TABLE invoices(id INTEGER PRIMARY KEY,order_id INTEGER,customer_id INTEGER,invoice_number TEXT);
+   CREATE TABLE orders(id INTEGER PRIMARY KEY);
+   CREATE TABLE fabrics(id INTEGER PRIMARY KEY,stock_meters REAL);
+   CREATE TABLE invoice_fabric_usage(invoice_id INTEGER,fabric_id INTEGER,meters REAL);
+   CREATE TABLE fabric_movements(fabric_id INTEGER,movement_type TEXT,meters REAL,balance_after REAL,reference_type TEXT,reference_id INTEGER,notes TEXT,created_at TEXT);
+   CREATE TABLE worker_cut_entries(invoice_id INTEGER);
+   CREATE TABLE worker_tailor_entries(invoice_id INTEGER);
+   CREATE TABLE financial_entries(invoice_id INTEGER,amount REAL);
+   INSERT INTO customers VALUES(1),(2);INSERT INTO orders VALUES(1),(2),(3);
+   INSERT INTO invoices VALUES(1,1,1,'1'),(2,2,1,'2'),(3,3,2,'3');
+   INSERT INTO fabrics VALUES(7,4);INSERT INTO invoice_fabric_usage VALUES(1,7,2),(2,7,3);
+   INSERT INTO financial_entries VALUES(1,100),(2,60),(3,90);").unwrap();
+  delete_customer_from_connection(&mut conn,1).unwrap();
+  assert_eq!(conn.query_row("SELECT COUNT(*) FROM customers",[],|r|r.get::<_,i64>(0)).unwrap(),1);
+  assert_eq!(conn.query_row("SELECT COUNT(*) FROM invoices",[],|r|r.get::<_,i64>(0)).unwrap(),1);
+  assert_eq!(conn.query_row("SELECT stock_meters FROM fabrics WHERE id=7",[],|r|r.get::<_,f64>(0)).unwrap(),9.0);
+  assert_eq!(conn.query_row("SELECT SUM(amount) FROM financial_entries",[],|r|r.get::<_,f64>(0)).unwrap(),90.0);
  }
 }
 
@@ -1664,8 +1742,24 @@ fn get_app_settings(app:AppHandle)->Result<AppSettings,String>{
  let shop_name=value("shop_name");let owner_name=value("owner_name");let accountant_name=value("accountant_name");
  let large_cut_price=value("large_cut_price").parse::<f64>().ok().filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(30.0);
  let small_cut_price=value("small_cut_price").parse::<f64>().ok().filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(25.0);
+ let auto_report_enabled=value("auto_report_enabled")=="true";
+ let auto_report_time=match value("auto_report_time").as_str(){""=>"00:00".to_string(),time=>time.to_string()};
+ let printer_check_minutes=value("printer_check_minutes").parse::<i64>().ok().filter(|minutes|*minutes>=1&&*minutes<=15).unwrap_or(3);
  let initialized=!shop_name.trim().is_empty()&&!owner_name.trim().is_empty()&&!finance_pin.is_empty()&&!app_pin.is_empty();
- Ok(AppSettings{shop_name,owner_name,accountant_name,finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()},initialized,large_cut_price,small_cut_price})
+ Ok(AppSettings{shop_name,owner_name,accountant_name,finance_pin_set:!finance_pin.is_empty(),app_pin_set:!app_pin.is_empty(),theme:if saved_theme=="light"{"light".into()}else{"dark".into()},initialized,large_cut_price,small_cut_price,auto_report_enabled,auto_report_time,printer_check_minutes})
+}
+
+#[tauri::command]
+fn save_auto_report_settings(app:AppHandle,enabled:bool,time:String,check_minutes:i64)->Result<AppSettings,String>{
+ let valid_time=time.len()==5&&time.as_bytes()[2]==b':'&&time[..2].parse::<u8>().is_ok_and(|h|h<24)&&time[3..].parse::<u8>().is_ok_and(|m|m<60);
+ if !valid_time||!(1..=15).contains(&check_minutes){return Err("حدد وقتًا صحيحًا وفترة فحص بين دقيقة و15 دقيقة".into())}
+ let mut conn=db(&app)?;
+ let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ for (key,value) in [("auto_report_enabled",enabled.to_string()),("auto_report_time",time),("printer_check_minutes",check_minutes.to_string())]{
+  transaction.execute("INSERT INTO app_settings(setting_key,setting_value) VALUES(?1,?2) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",params![key,value]).map_err(|e|e.to_string())?;
+ }
+ transaction.commit().map_err(|e|e.to_string())?;
+ get_app_settings(app)
 }
 
 #[tauri::command]
@@ -2328,8 +2422,14 @@ mod invoice_fabric_tests{
 #[tauri::command]
 fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,String>{
  validate_invoice_fabrics(&payload.details_json,payload.total_thobes)?;
+ if let Some(minimum)=payload.minimum_price{
+  if !minimum.is_finite()||minimum<0.0{return Err("الحد الأدنى للسعر غير صالح".into())}
+  let total=parse_money(&payload.total_price);let discount=parse_money(&payload.discount);
+  if !total.is_finite()||!discount.is_finite()||total<0.0||discount<0.0||total+0.0001<minimum||total-discount+0.0001<minimum{return Err(format!("السعر غير مناسب: الإجمالي بعد الخصم لا يمكن أن يقل عن {} ر.س",minimum))}
+ }
  let mut conn=db(&app)?;
  if let Some(id)=payload.id{
+  if payload.new_customer.is_some(){return Err("لا يمكن إنشاء عميل جديد عند تعديل فاتورة".into())}
   let transaction=conn.transaction().map_err(|e|e.to_string())?;
  let old_paid_text:String=transaction.query_row("SELECT paid_amount FROM invoices WHERE id=?1 AND customer_id=?2",params![id,payload.customer_id],|row|row.get(0)).map_err(|_|"الفاتورة غير موجودة".to_string())?;
   let payment_delta=parse_money(&payload.paid_amount)-parse_money(&old_paid_text);
@@ -2357,9 +2457,21 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
   apply_invoice_fabric_usage(&transaction,id,&payload.fabric_usages,payload.confirm_low_stock)?;
   apply_invoice_worker_cuts(&transaction,id,&payload.worker_cuts)?;
   transaction.commit().map_err(|e|e.to_string())?;
-  return Ok(InvoiceRecord{id,invoice_number,created_at,payment_method:effective_method})
+  return Ok(InvoiceRecord{id,customer_id:payload.customer_id,invoice_number,created_at,payment_method:effective_method})
  }
  let transaction=conn.transaction().map_err(|e|e.to_string())?;
+ let customer_id=if let Some(new_customer)=&payload.new_customer{
+  let name=new_customer.name.trim();let phone=new_customer.phone.trim();
+  if name.is_empty(){return Err("اسم العميل مطلوب".into())}
+  if normalized_customer_phone(phone).len()<7{return Err("رقم الجوال غير صحيح".into())}
+  ensure_customer_phone_available(&transaction,phone,None)?;
+  transaction.execute("INSERT INTO customers(customer_code,name,phone,created_at) VALUES(NULL,?1,?2,datetime('now','localtime'))",params![name,phone]).map_err(|e|e.to_string())?;
+  let id=transaction.last_insert_rowid();
+  transaction.execute("UPDATE customers SET customer_code=?1 WHERE id=?2",params![id.to_string(),id]).map_err(|e|e.to_string())?;
+  id
+ }else{
+  transaction.query_row("SELECT id FROM customers WHERE id=?1",[payload.customer_id],|row|row.get(0)).map_err(|_|"العميل غير موجود".to_string())?
+ };
  transaction.execute(
   "INSERT INTO orders(received_date,quantity,print_status,delivery_date) VALUES(date('now','localtime'),?1,'بانتظار الطباعة',NULLIF(?2,''))",
   params![payload.total_thobes,&payload.delivery_date]
@@ -2367,7 +2479,7 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  let order_id=transaction.last_insert_rowid();
  transaction.execute(
   "INSERT INTO invoices(invoice_number,order_id,customer_id,created_at,updated_at,weight,delivery_date,day_count,total_thobes,total_price,paid_amount,payment_method,discount,notes,measurements_json,fabric_json,designs_json,details_json) VALUES(NULL,?1,?2,datetime('now','localtime'),datetime('now','localtime'),?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
-  params![order_id,payload.customer_id,&payload.weight,&payload.delivery_date,payload.day_count,payload.total_thobes,&payload.total_price,&payload.paid_amount,&payload.payment_method,&payload.discount,&payload.notes,&payload.measurements_json,&payload.fabric_json,&payload.designs_json,&payload.details_json]
+  params![order_id,customer_id,&payload.weight,&payload.delivery_date,payload.day_count,payload.total_thobes,&payload.total_price,&payload.paid_amount,&payload.payment_method,&payload.discount,&payload.notes,&payload.measurements_json,&payload.fabric_json,&payload.designs_json,&payload.details_json]
  ).map_err(|e|e.to_string())?;
  let id=transaction.last_insert_rowid();
  let invoice_number=id.to_string();
@@ -2383,7 +2495,7 @@ fn save_invoice(app:AppHandle,payload:InvoicePayload)->Result<InvoiceRecord,Stri
  apply_invoice_worker_cuts(&transaction,id,&payload.worker_cuts)?;
  let created_at:String=transaction.query_row("SELECT created_at FROM invoices WHERE id=?1",[id],|row|row.get(0)).map_err(|e|e.to_string())?;
  transaction.commit().map_err(|e|e.to_string())?;
- Ok(InvoiceRecord{id,invoice_number,created_at,payment_method:effective_method})
+ Ok(InvoiceRecord{id,customer_id,invoice_number,created_at,payment_method:effective_method})
 }
 
 #[cfg(test)]
@@ -2432,7 +2544,7 @@ mod accounting_dashboard_report_tests{
 }
 
 fn main(){
- let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
+ let handler:fn(tauri::ipc::Invoke)->bool=tauri::generate_handler![license_status,activate_license,print_direct,list_printers,report_printer_ready,save_auto_report_settings,dashboard_summary,work_board,advance_order_status,retreat_order_status,move_orders_to_status,current_session,session_history,storage_info,set_storage_location,create_customer,update_customer,delete_customer,delete_invoice,search_customers,find_customer_by_phone,customer_invoices,list_design_options,add_design_option,delete_design_option,list_suppliers,add_supplier,list_supplier_payments,add_supplier_payment,list_supplier_ledger,update_supplier_ledger_date,list_fabrics,add_fabric,restock_fabric,fabric_movements,list_ready_products,list_ready_productions,add_ready_production,list_ready_items,add_ready_item,delete_ready_item,list_notes,add_note,toggle_note,delete_note,list_whatsapp_campaigns,save_whatsapp_campaign,financial_overview,add_financial_entry,record_invoice_payment,daily_report,get_app_settings,save_app_settings,save_cut_prices,list_worker_names,list_workers,save_worker,add_worker,delete_worker,archive_worker,worker_account,record_worker_withdrawal,worker_ledger,clear_finance_pin,clear_app_pin,verify_finance_pin,verify_app_pin,admin_reset_pin,save_theme,list_extra_transactions,save_extra_transaction,save_invoice];
  tauri::Builder::default()
   .plugin(tauri_plugin_dialog::init())
   .setup(|app|{
